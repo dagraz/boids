@@ -6,22 +6,29 @@ interface BoidProperties {
     maxSpeed: number;
     maxAcceleration: number;
 
-    /*
-    awarenessRadius: number;
-    awarenessField: number;
+    awarenessRadiusSq: number;
+
+    // If we want to experiement with Boids having a blind spot behind them
+    // awarenessField: number;
 
     separation: number;
-    alignment: number;
     cohesion: number;
-*/
+    alignment: number;
+
     edgeAvoidance: number;
+    edgeAwareness: number;
 }
 
 const DEFAULT_BOID_PROPERTIES: BoidProperties = {
     minSpeed: 0.5,
     maxSpeed: 2,
-    maxAcceleration: 0.5,
-    edgeAvoidance: 0.01
+    maxAcceleration: 0.2,
+    awarenessRadiusSq: 10000,
+    separation: 1,
+    cohesion: 0.005,
+    alignment: 0.025,
+    edgeAvoidance: 5,
+    edgeAwareness: 100
 };
 
 interface WorldProperties {
@@ -30,7 +37,7 @@ interface WorldProperties {
 };
 
 class Boid {
-    constructor(public x = 150, public y = 100, public speed = 1, public direction = Math.PI, wp: WorldProperties) {
+    constructor(public x: number, public y: number, speed: number, public direction: number, wp: WorldProperties) {
         this.vx = speed * Math.cos(direction);
         this.vy = speed * Math.sin(direction);
         this.properties = DEFAULT_BOID_PROPERTIES;
@@ -57,32 +64,102 @@ class Boid {
     }
 
     edgeAvoidance(edgeDistance: number): number {
-        if (edgeDistance < 100) {
-            return Math.max(1, (1 - edgeDistance / 100 )) * 0.01;
+        const edgeAwareness = this.properties.edgeAwareness;
+        if (edgeDistance === 0) {
+            return this.properties.edgeAvoidance;
+        } else if (edgeDistance < edgeAwareness) {
+            return this.properties.edgeAvoidance / edgeDistance;
         } else {
             return 0;
         }
     }
 
-    update() {
-        let delta_vx = 0;
-        let delta_vy = 0;
+    update(nearBoids: Boid[]) {
+        let deltaVx = 0;
+        let deltaVy = 0;
 
         // avoid edges
-        delta_vx += this.edgeAvoidance(this.x);
-        delta_vx -= this.edgeAvoidance(this.worldProperties.width - this.x);
-        delta_vy += this.edgeAvoidance(this.y);
-        delta_vy -= this.edgeAvoidance(this.worldProperties.height - this.y);
+        deltaVx += this.edgeAvoidance(this.x);
+        deltaVx -= this.edgeAvoidance(this.worldProperties.width - this.x);
+        deltaVy += this.edgeAvoidance(this.y);
+        deltaVy -= this.edgeAvoidance(this.worldProperties.height - this.y);
         
-        // todo: cap acceleration
-        // todo: cap velocity
-        this.vx += delta_vx;
-        this.vy += delta_vy;
+        let sumX = 0;
+        let sumY = 0;
+        let sumVx = 0;
+        let sumVy = 0;
+        let numBoids = 0;
+        
+        for (const otherBoid of nearBoids) {
+            sumX += otherBoid.x;
+            sumY += otherBoid.y;
+            sumVx += otherBoid.vx;
+            sumVy += otherBoid.vy;
+            numBoids++;
+
+            // avoid each other
+            // strength of avoidance is inversely proportional to distance
+            const distanceSq = Math.max(1, boidDistanceSq(this, otherBoid));
+            const diffX = this.x - otherBoid.x;
+            const diffY = this.y - otherBoid.y;
+
+            deltaVx += diffX / distanceSq * this.properties.separation;
+            deltaVy += diffY / distanceSq * this.properties.separation;
+        }
+
+        if (numBoids > 0) {
+            // Cohesion
+            // Note the strength of the cohesive impulse is directly proportional to the distance from the center
+            const averageX = sumX / numBoids;
+            const averageY = sumY / numBoids;
+            deltaVx += (averageX - this.x) * this.properties.cohesion;
+            deltaVy += (averageY - this.y) * this.properties.cohesion;
+
+            // Alignment
+            // Note the strength of the cohesive impulse is directly proportional to the magnitude of the misalignment
+            const averageVx = sumVx / numBoids;
+            const averageVy = sumVy / numBoids;
+
+            deltaVx += (averageVx - deltaVx) * this.properties.alignment;
+            deltaVy += (averageVy - deltaVy) * this.properties.alignment;
+        }
+
+        // cap acceleration
+        const deltaVMagnitude = Math.sqrt(square(deltaVx) + square(deltaVy));
+        if (deltaVMagnitude > this.properties.maxAcceleration) {
+            deltaVx *= this.properties.maxAcceleration / deltaVMagnitude;
+            deltaVy *= this.properties.maxAcceleration / deltaVMagnitude;
+        }
+
+        // update and cap velocity
+        this.vx += deltaVx;
+        this.vy += deltaVy;
+
+        const vMagnitude = Math.sqrt(square(this.vx) + square(this.vy));
+        if (vMagnitude > this.properties.maxSpeed) {
+            this.vx *= this.properties.maxSpeed / vMagnitude;
+            this.vy *= this.properties.maxSpeed / vMagnitude;
+        } else if (vMagnitude < this.properties.minSpeed) {
+            this.vx *= this.properties.minSpeed / vMagnitude;
+            this.vy *= this.properties.minSpeed / vMagnitude;
+        }
         
         this.direction = Math.atan2(this.vy, this.vx);
     }
 }
 
+function square(x: number): number {
+    return x * x;
+}
+
+function boidDistanceSq(boidA: Boid, boidB: Boid): number {
+
+    return square(boidA.x - boidB.x) + square(boidA.y - boidB.y);
+}
+
+function boidDistance(boidA: Boid, boidB: Boid): number {
+    return Math.sqrt(boidDistanceSq(boidA, boidB));
+}
 
 class World {
     public canvas: HTMLCanvasElement;
@@ -109,8 +186,9 @@ class World {
     }
 
     drawBoids() {
-        this.context.clearRect(0, 0, canvas.width, canvas.height);
-
+        //this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.context.fillStyle = "rgb(255 255 255 / 10%)";
+        this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
         for (let boid of this.boids) {
             boid.draw(this.context);
         }
@@ -118,14 +196,34 @@ class World {
 
     moveBoids() {
         for (let boid of this.boids) {
-            boid.x += boid.speed * Math.cos(boid.direction);
-            boid.y += boid.speed * Math.sin(boid.direction);
+            // todo:  look in to factoring in acceleration, too
+            boid.x += boid.vx;
+            boid.y += boid.vy;
         }
     }   
     
+    // Brute force O(n^2).
+    // TODO: look into a spatial data structure
+    getNearBoids(boid: Boid): Boid[] {
+        let nearBoids: Boid[] = [];
+
+        for (let otherBoid of this.boids) {
+            if (otherBoid === boid) {
+                continue;
+            }
+
+            if (boidDistanceSq(boid, otherBoid) < boid.properties.awarenessRadiusSq) {
+                nearBoids.push(otherBoid);
+            }
+        }
+
+        return nearBoids;
+    }
+
     updateBoids() {
         for (let boid of this.boids) {
-            boid.update();
+
+            boid.update(this.getNearBoids(boid));
         }
     }
 }
@@ -134,7 +232,7 @@ let canvas = document.getElementsByTagName("canvas")[0];
 canvas.width = 1000;
 canvas.height = 800;    
 
-const world = new World(canvas, 10);
+const world = new World(canvas, 1000);
 world.drawBoids();
 
 function cycle() {
