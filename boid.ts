@@ -1,6 +1,11 @@
 // taking inspiration from: https://vanhunteradams.com/Pico/Animal_Movement/Boids-algorithm.html
 //
 
+interface Position {
+    x: number;
+    y: number;
+}
+
 interface BoidProperties {
     minSpeed: number;
     maxSpeed: number;
@@ -15,6 +20,9 @@ interface BoidProperties {
     cohesion: number;
     alignment: number;
 
+    // Flee or chase the mouse pointer.  
+    mouseAvoidance: number;
+
     edgeAvoidance: number;
     edgeAwareness: number;
 }
@@ -27,6 +35,7 @@ const DEFAULT_BOID_PROPERTIES: BoidProperties = {
     separation: 1,
     cohesion: 0.005,
     alignment: 0.025,
+    mouseAvoidance: 5,
     edgeAvoidance: 5,
     edgeAwareness: 100
 };
@@ -40,12 +49,18 @@ class Boid {
     constructor(public x: number, public y: number, speed: number, public direction: number, wp: WorldProperties) {
         this.vx = speed * Math.cos(direction);
         this.vy = speed * Math.sin(direction);
+        this.deltaVx = 0;
+        this.deltaVy = 0;
+
         this.properties = DEFAULT_BOID_PROPERTIES;
         this.worldProperties = wp;
     }
 
     vx: number;
     vy: number;
+    deltaVx: number;
+    deltaVy: number;
+
     properties: BoidProperties;
     worldProperties: WorldProperties;
 
@@ -58,7 +73,7 @@ class Boid {
         context.lineTo(0,3);
         context.lineTo(0,-3);
         context.closePath();
-        context.fillStyle = "blue";
+        context.fillStyle = "red";
         context.fill();
         context.restore();
     }
@@ -74,15 +89,15 @@ class Boid {
         }
     }
 
-    update(nearBoids: Boid[]) {
-        let deltaVx = 0;
-        let deltaVy = 0;
+    update(nearBoids: Boid[], mousePosition: Position | null) {
+        this.deltaVx = 0;
+        this.deltaVy = 0;
 
         // avoid edges
-        deltaVx += this.edgeAvoidance(this.x);
-        deltaVx -= this.edgeAvoidance(this.worldProperties.width - this.x);
-        deltaVy += this.edgeAvoidance(this.y);
-        deltaVy -= this.edgeAvoidance(this.worldProperties.height - this.y);
+        this.deltaVx += this.edgeAvoidance(this.x);
+        this.deltaVx -= this.edgeAvoidance(this.worldProperties.width - this.x);
+        this.deltaVy += this.edgeAvoidance(this.y);
+        this.deltaVy -= this.edgeAvoidance(this.worldProperties.height - this.y);
         
         let sumX = 0;
         let sumY = 0;
@@ -103,8 +118,8 @@ class Boid {
             const diffX = this.x - otherBoid.x;
             const diffY = this.y - otherBoid.y;
 
-            deltaVx += diffX / distanceSq * this.properties.separation;
-            deltaVy += diffY / distanceSq * this.properties.separation;
+            this.deltaVx += diffX / distanceSq * this.properties.separation;
+            this.deltaVy += diffY / distanceSq * this.properties.separation;
         }
 
         if (numBoids > 0) {
@@ -112,37 +127,49 @@ class Boid {
             // Note the strength of the cohesive impulse is directly proportional to the distance from the center
             const averageX = sumX / numBoids;
             const averageY = sumY / numBoids;
-            deltaVx += (averageX - this.x) * this.properties.cohesion;
-            deltaVy += (averageY - this.y) * this.properties.cohesion;
+            this.deltaVx += (averageX - this.x) * this.properties.cohesion;
+            this.deltaVy += (averageY - this.y) * this.properties.cohesion;
 
             // Alignment
             // Note the strength of the cohesive impulse is directly proportional to the magnitude of the misalignment
             const averageVx = sumVx / numBoids;
             const averageVy = sumVy / numBoids;
 
-            deltaVx += (averageVx - deltaVx) * this.properties.alignment;
-            deltaVy += (averageVy - deltaVy) * this.properties.alignment;
+            this.deltaVx += (averageVx - this.deltaVx) * this.properties.alignment;
+            this.deltaVy += (averageVy - this.deltaVy) * this.properties.alignment;
+        }
+
+        // avoid the mouse
+        if (this.properties.mouseAvoidance !== 0 && mousePosition) {
+            // strength of avoidance is inversely proportional to distance
+            const diffX = this.x - mousePosition.x;
+            const diffY = this.y - mousePosition.y;
+            const distanceSq = Math.max(1, square(diffX) + square(diffY));
+
+            this.deltaVx += diffX / distanceSq * this.properties.mouseAvoidance;
+            this.deltaVy += diffY / distanceSq * this.properties.mouseAvoidance;
+
         }
 
         // cap acceleration
-        const deltaVMagnitude = Math.sqrt(square(deltaVx) + square(deltaVy));
+        const deltaVMagnitude = Math.sqrt(square(this.deltaVx) + square(this.deltaVy));
         if (deltaVMagnitude > this.properties.maxAcceleration) {
-            deltaVx *= this.properties.maxAcceleration / deltaVMagnitude;
-            deltaVy *= this.properties.maxAcceleration / deltaVMagnitude;
+            this.deltaVx *= this.properties.maxAcceleration / deltaVMagnitude;
+            this.deltaVy *= this.properties.maxAcceleration / deltaVMagnitude;
         }
 
         // update and cap velocity
-        this.vx += deltaVx;
-        this.vy += deltaVy;
+        this.vx += this.deltaVx;
+        this.vy += this.deltaVy;
 
         const vMagnitude = Math.sqrt(square(this.vx) + square(this.vy));
         if (vMagnitude > this.properties.maxSpeed) {
             this.vx *= this.properties.maxSpeed / vMagnitude;
             this.vy *= this.properties.maxSpeed / vMagnitude;
-        } else if (vMagnitude < this.properties.minSpeed) {
+        } else if (vMagnitude < this.properties.minSpeed && vMagnitude > 0) {
             this.vx *= this.properties.minSpeed / vMagnitude;
             this.vy *= this.properties.minSpeed / vMagnitude;
-        }
+        } // just going to ignore the === 0 case for now
         
         this.direction = Math.atan2(this.vy, this.vx);
     }
@@ -168,6 +195,8 @@ class World {
 
     properties: WorldProperties;
 
+    mousePosition: Position | null;
+
     constructor(canvas: HTMLCanvasElement, num_boids: number) {
         this.canvas = canvas;
         this.context = canvas.getContext("2d") as CanvasRenderingContext2D;
@@ -175,6 +204,8 @@ class World {
             width: canvas.width,
             height: canvas.height
         };
+
+        this.mousePosition = null;
 
         this.boids = []
         while (this.boids.length < num_boids) {
@@ -196,9 +227,8 @@ class World {
 
     moveBoids() {
         for (let boid of this.boids) {
-            // todo:  look in to factoring in acceleration, too
-            boid.x += boid.vx;
-            boid.y += boid.vy;
+            boid.x += boid.vx + 0.5 * boid.deltaVx;
+            boid.y += boid.vy + 0.5 * boid.deltaVy;
         }
     }   
     
@@ -222,8 +252,7 @@ class World {
 
     updateBoids() {
         for (let boid of this.boids) {
-
-            boid.update(this.getNearBoids(boid));
+            boid.update(this.getNearBoids(boid), this.mousePosition);
         }
     }
 }
@@ -233,8 +262,19 @@ canvas.width = 1000;
 canvas.height = 800;    
 
 const world = new World(canvas, 1000);
-world.drawBoids();
 
+canvas.addEventListener("mousemove", (e) => {
+    if (world.mousePosition === null) {
+        world.mousePosition = {x: 0, y: 0} as Position;
+    }
+    world.mousePosition.x = e.clientX;
+    world.mousePosition.y = e.clientY;
+  });
+
+canvas.addEventListener("mouseout", (e) => {
+    world.mousePosition = null;
+  });
+  
 function cycle() {
     world.updateBoids();
     world.moveBoids();
