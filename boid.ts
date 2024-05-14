@@ -68,17 +68,32 @@ class Boid {
         // turns out save/restore are a little pricey for how lightly this uses them.
         // doing a cheap restore-by-hand shaves off some small but non-trivial CPU.
         context.translate(Math.floor(this.x), Math.floor(this.y));
+
+        // Also turns out rotate is weirdly expensive.
+        /*
         context.rotate(this.direction);
         context.beginPath();
         context.moveTo(7, 0);
         context.lineTo(0,3);
         context.lineTo(0,-3);
         context.closePath();
+        */
+
+        const cos = Math.cos(this.direction);
+        const sin = Math.sin(this.direction);
+
+        context.beginPath();
+        context.moveTo(Math.floor(7 * cos), Math.floor(7 * sin));
+        context.lineTo(Math.floor(-3 * sin), Math.floor(3 * cos));
+        context.lineTo(Math.floor(3 * sin), Math.floor(-3 * cos));
+        context.closePath();
+
+
         context.fillStyle = "red";
         context.fill();
 
         // restore by-hand
-        context.rotate(-this.direction);
+        //context.rotate(-this.direction);
         context.translate(-Math.floor(this.x), -Math.floor(this.y));
     }
 
@@ -367,7 +382,7 @@ let canvas = document.getElementsByTagName("canvas")[0];
 canvas.width = 1000;
 canvas.height = 800;    
 
-const world = new World(canvas, 2000, true);
+const world = new World(canvas, 250, true);
 
 canvas.addEventListener("mousemove", (e) => {
     if (world.mousePosition === null) {
