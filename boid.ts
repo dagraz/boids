@@ -1,5 +1,8 @@
 // taking inspiration from: https://vanhunteradams.com/Pico/Animal_Movement/Boids-algorithm.html
 //
+// todo: 
+//  * move most Boid properties to World, and build a general mechanism for modifying at runtime
+
 
 interface Position {
     x: number;
@@ -48,6 +51,15 @@ const DEFAULT_BOID_PROPERTIES: BoidProperties = {
 interface WorldProperties {
     width: number;
     height: number;
+    continuousCohorts: boolean;
+    homogenousCohorts: boolean;
+};
+
+const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
+    width: 1000,
+    height: 800,
+    continuousCohorts: false,
+    homogenousCohorts: true
 };
 
 class Boid {
@@ -105,7 +117,7 @@ class Boid {
 
     edgeAvoidance(edgeDistance: number): number {
         const edgeAwareness = this.properties.edgeAwareness;
-        if (edgeDistance === 0) {
+        if (edgeDistance <= 0) {
             return this.properties.edgeAvoidance;
         } else if (edgeDistance < edgeAwareness) {
             return this.properties.edgeAvoidance / edgeDistance;
@@ -132,7 +144,20 @@ class Boid {
         
         for (const otherBoid of nearBoids) {
             // Boids will only cohere and align with members of the same cohort
-            if (otherBoid.properties.cohort === this.properties.cohort) {
+            if (this.worldProperties.continuousCohorts) {
+                const baseWeight = Math.min(
+                    Math.abs(otherBoid.properties.cohort - this.properties.cohort),
+                    otherBoid.properties.cohort + (360 - this.properties.cohort)) / 180;
+                const weight = this.worldProperties.homogenousCohorts ?
+                    1 - baseWeight :
+                    baseWeight;
+                
+                sumX += otherBoid.x * weight;
+                sumY += otherBoid.y * weight;
+                sumVx += otherBoid.vx * weight;
+                sumVy += otherBoid.vy * weight;
+                numBoids += weight;
+            } else if (otherBoid.properties.cohort === this.properties.cohort) {
                 sumX += otherBoid.x;
                 sumY += otherBoid.y;
                 sumVx += otherBoid.vx;
@@ -240,12 +265,14 @@ class World {
         return Math.floor(cleanY / this.bucketYSize);
     }
 
-    constructor(canvas: HTMLCanvasElement, num_boids: number, public useSpaceBuckets: boolean) {
+    constructor(canvas: HTMLCanvasElement, num_boids: number, 
+        public useSpaceBuckets: boolean, weightedCohorts: boolean = false) {
         this.canvas = canvas;
         this.context = canvas.getContext("2d", {alpha: false}) as CanvasRenderingContext2D;
-        this.properties = {
+        this.properties = {...WORLD_PROPERTIES_DEFAULT, 
             width: canvas.width,
-            height: canvas.height
+            height: canvas.height,
+            continuousCohorts: weightedCohorts,
         };
 
         this.mousePosition = null;
@@ -275,12 +302,16 @@ class World {
 
         while (this.boids.length < num_boids) {
             let boidProperties: Partial<BoidProperties> = {};
-            const cohortSelector = Math.random();
-            if (cohortSelector < 0.5) {
-                boidProperties.cohort = 1;
-                boidProperties.color = "blue";
+            if (this.properties.continuousCohorts) {
+                boidProperties.cohort = 360 * Math.random();
+                boidProperties.color = `hsl(${boidProperties.cohort} 100% 50%)`;
+            } else {
+                const cohortSelector = Math.random();
+                if (cohortSelector < 0.5) {
+                    boidProperties.cohort = 1;
+                    boidProperties.color = "blue";
+                }
             }
-
             const boid = new Boid(
                 (Math.random() * 0.8 + 0.1) * this.properties.width,
                 (Math.random() * 0.8 + 0.1) * this.properties.height,
@@ -319,6 +350,7 @@ class World {
         }
 
         for (let boid of this.boids) {
+            // distance = velocity * time + 1/2 * acceleration * time^2
             boid.x += boid.vx + 0.5 * boid.deltaVx;
             boid.y += boid.vy + 0.5 * boid.deltaVy;
 
@@ -349,6 +381,7 @@ class World {
     getNearBoids(boid: Boid): Boid[] {   
         let nearBoids: Boid[] = [];
         const awarenessRadius = boid.properties.awarenessRadius;
+        const sqAwarenessRadius = square(awarenessRadius);
 
         const minXBucket = this.xToBucket(boid.x - awarenessRadius);
         const maxXBucket = this.xToBucket(boid.x + awarenessRadius);
@@ -362,7 +395,7 @@ class World {
                         continue;
                     }
 
-                    if (boidDistanceSq(boid, otherBoid) < square(awarenessRadius)) {
+                    if (boidDistanceSq(boid, otherBoid) < sqAwarenessRadius) {
                         nearBoids.push(otherBoid);
                     }
                 }
@@ -387,7 +420,7 @@ let canvas = document.getElementsByTagName("canvas")[0];
 canvas.width = 1000;
 canvas.height = 800;    
 
-const world = new World(canvas, 500, true);
+const world = new World(canvas, 1000, true, true);
 
 canvas.addEventListener("mousemove", (e) => {
     if (world.mousePosition === null) {
