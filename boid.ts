@@ -25,6 +25,9 @@ interface BoidProperties {
 
     edgeAvoidance: number;
     edgeAwareness: number;
+
+    color: string;
+    cohort: number;
 }
 
 const DEFAULT_BOID_PROPERTIES: BoidProperties = {
@@ -37,7 +40,9 @@ const DEFAULT_BOID_PROPERTIES: BoidProperties = {
     alignment: 0.025,
     mouseAvoidance: 5,
     edgeAvoidance: 5,
-    edgeAwareness: 100
+    edgeAwareness: 100,
+    color: "red",
+    cohort: 0,
 };
 
 interface WorldProperties {
@@ -46,13 +51,14 @@ interface WorldProperties {
 };
 
 class Boid {
-    constructor(public x: number, public y: number, speed: number, public direction: number, wp: WorldProperties) {
+    constructor(public x: number, public y: number, speed: number, public direction: number, wp: WorldProperties,
+        properties: Partial<BoidProperties>) {
         this.vx = speed * Math.cos(direction);
         this.vy = speed * Math.sin(direction);
         this.deltaVx = 0;
         this.deltaVy = 0;
 
-        this.properties = DEFAULT_BOID_PROPERTIES;
+        this.properties = {...DEFAULT_BOID_PROPERTIES, ...properties };
         this.worldProperties = wp;
     }
 
@@ -69,7 +75,8 @@ class Boid {
         // doing a cheap restore-by-hand shaves off some small but non-trivial CPU.
         context.translate(Math.floor(this.x), Math.floor(this.y));
 
-        // Also turns out rotate is weirdly expensive.
+        // Also turns out rotate is weirdly expensive.  
+        // The shape is basic enough we'll do it by hand.
         /*
         context.rotate(this.direction);
         context.beginPath();
@@ -89,7 +96,7 @@ class Boid {
         context.closePath();
 
 
-        context.fillStyle = "red";
+        context.fillStyle = this.properties.color;
         context.fill();
 
         // restore by-hand
@@ -126,11 +133,14 @@ class Boid {
         let numBoids = 0;
         
         for (const otherBoid of nearBoids) {
-            sumX += otherBoid.x;
-            sumY += otherBoid.y;
-            sumVx += otherBoid.vx;
-            sumVy += otherBoid.vy;
-            numBoids++;
+            // Boids will only cohere and align with members of the same cohort
+            if (otherBoid.properties.cohort === this.properties.cohort) {
+                sumX += otherBoid.x;
+                sumY += otherBoid.y;
+                sumVx += otherBoid.vx;
+                sumVy += otherBoid.vy;
+                numBoids++;
+            }
 
             // avoid each other
             // strength of avoidance is inversely proportional to distance
@@ -265,10 +275,17 @@ class World {
         this.boids = []
 
         while (this.boids.length < num_boids) {
+            let boidProperties: Partial<BoidProperties> = {};
+            const cohortSelector = Math.random();
+            if (cohortSelector < 0.5) {
+                boidProperties.cohort = 1;
+                boidProperties.color = "blue";
+            }
+
             const boid = new Boid(
                 (Math.random() * 0.8 + 0.1) * this.properties.width,
                 (Math.random() * 0.8 + 0.1) * this.properties.height,
-                1, Math.random() * 2 * Math.PI, this.properties);
+                1, Math.random() * 2 * Math.PI, this.properties, boidProperties);
 
             this.boids.push(boid);
 
@@ -382,7 +399,7 @@ let canvas = document.getElementsByTagName("canvas")[0];
 canvas.width = 1000;
 canvas.height = 800;    
 
-const world = new World(canvas, 250, true);
+const world = new World(canvas, 500, true);
 
 canvas.addEventListener("mousemove", (e) => {
     if (world.mousePosition === null) {
