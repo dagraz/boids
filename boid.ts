@@ -99,8 +99,6 @@ class Boid {
         context.fillStyle = this.properties.color;
         context.fill();
 
-        // restore by-hand
-        //context.rotate(-this.direction);
         context.translate(-Math.floor(this.x), -Math.floor(this.y));
     }
 
@@ -144,6 +142,8 @@ class Boid {
 
             // avoid each other
             // strength of avoidance is inversely proportional to distance
+            // (*not* the square of the distance!  dividing out by the non-squared distance 
+            // gives you a unit-direction vector, so the magnitude would be invariant to the distance.)
             const distanceSq = Math.max(1, boidDistanceSq(this, otherBoid));
             const diffX = this.x - otherBoid.x;
             const diffY = this.y - otherBoid.y;
@@ -210,7 +210,6 @@ function square(x: number): number {
 }
 
 function boidDistanceSq(boidA: Boid, boidB: Boid): number {
-
     return square(boidA.x - boidB.x) + square(boidA.y - boidB.y);
 }
 
@@ -302,7 +301,6 @@ class World {
         this.context.fillStyle = "rgb(255 255 255 / 10%)";
         this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
         for (let boid of this.boids) {
-            //boid.draw(this.context);
             boid.draw(this.context);
         }
     }
@@ -333,11 +331,9 @@ class World {
     }   
     
     getNearBoidsQuadratic(boid: Boid): Boid[] {
-        let consideredBoids = 0;
         let nearBoids: Boid[] = [];
 
         for (let otherBoid of this.boids) {
-            consideredBoids++;
             if (otherBoid === boid) {
                 continue;
             }
@@ -347,14 +343,10 @@ class World {
             }
         }
 
-        //console.log(consideredBoids, nearBoids.length);
         return nearBoids;
     }
 
     getNearBoids(boid: Boid): Boid[] {   
-        let consideredBoids = 0;
-        let consideredBuckets = 0;
-
         let nearBoids: Boid[] = [];
         const awarenessRadius = boid.properties.awarenessRadius;
 
@@ -365,10 +357,7 @@ class World {
                         
         for (let i = minXBucket; i <= maxXBucket; i++) {
             for (let j = minYBucket; j <= maxYBucket; j++) {
-                consideredBuckets++;
                 for (let otherBoid of this.spaceBuckets[i][j]) {
-                    consideredBoids++;
-
                     if (otherBoid === boid) {
                         continue;
                     }
@@ -380,7 +369,6 @@ class World {
             }
         }
 
-        //console.log(consideredBuckets, consideredBoids, nearBoids.length);
         return nearBoids;
     }
 
