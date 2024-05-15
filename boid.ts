@@ -10,6 +10,23 @@ interface Position {
 }
 
 interface BoidProperties {
+    color: string;
+    cohort: number;
+}
+
+const DEFAULT_BOID_PROPERTIES: BoidProperties = {
+    color: "red",
+    cohort: 0,
+};
+
+interface WorldProperties {
+    width: number;
+    height: number;
+    circularBorder: boolean;
+    continuousCohorts: boolean;
+    homogenousCohorts: boolean;
+
+    // Global parameters for boid behavior
     minSpeed: number;
     maxSpeed: number;
     maxAcceleration: number;
@@ -27,13 +44,15 @@ interface BoidProperties {
     mouseAvoidance: number;
 
     edgeAvoidance: number;
-    edgeAwareness: number;
+};
 
-    color: string;
-    cohort: number;
-}
+const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
+    width: 1000,
+    height: 800,
+    circularBorder: false,
+    continuousCohorts: false,
+    homogenousCohorts: true,
 
-const DEFAULT_BOID_PROPERTIES: BoidProperties = {
     minSpeed: 0.5,
     maxSpeed: 2,
     maxAcceleration: 0.2,
@@ -43,25 +62,6 @@ const DEFAULT_BOID_PROPERTIES: BoidProperties = {
     alignment: 0.025,
     mouseAvoidance: 5,
     edgeAvoidance: 5,
-    edgeAwareness: 100,
-    color: "red",
-    cohort: 0,
-};
-
-interface WorldProperties {
-    width: number;
-    height: number;
-    circularBorder: boolean;
-    continuousCohorts: boolean;
-    homogenousCohorts: boolean;
-};
-
-const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
-    width: 1000,
-    height: 800,
-    circularBorder: false,
-    continuousCohorts: false,
-    homogenousCohorts: true
 };
 
 class Boid {
@@ -118,13 +118,10 @@ class Boid {
 
 
     edgeAvoidance(edgeDistance: number): number {
-        const edgeAwareness = this.properties.edgeAwareness;
         if (edgeDistance <= 0) {
-            return this.properties.edgeAvoidance;
-        } else if (edgeDistance < edgeAwareness) {
-            return this.properties.edgeAvoidance / edgeDistance;
+            return this.worldProperties.edgeAvoidance;
         } else {
-            return 0;
+            return this.worldProperties.edgeAvoidance / edgeDistance;
         }
     }
 
@@ -189,8 +186,8 @@ class Boid {
             const diffX = this.x - otherBoid.x;
             const diffY = this.y - otherBoid.y;
 
-            this.deltaVx += diffX / distanceSq * this.properties.separation;
-            this.deltaVy += diffY / distanceSq * this.properties.separation;
+            this.deltaVx += diffX / distanceSq * this.worldProperties.separation;
+            this.deltaVy += diffY / distanceSq * this.worldProperties.separation;
         }
 
         if (numBoids > 0) {
@@ -198,35 +195,35 @@ class Boid {
             // Note the strength of the cohesive impulse is directly proportional to the distance from the center
             const averageX = sumX / numBoids;
             const averageY = sumY / numBoids;
-            this.deltaVx += (averageX - this.x) * this.properties.cohesion;
-            this.deltaVy += (averageY - this.y) * this.properties.cohesion;
+            this.deltaVx += (averageX - this.x) * this.worldProperties.cohesion;
+            this.deltaVy += (averageY - this.y) * this.worldProperties.cohesion;
 
             // Alignment
             // Note the strength of the cohesive impulse is directly proportional to the magnitude of the misalignment
             const averageVx = sumVx / numBoids;
             const averageVy = sumVy / numBoids;
 
-            this.deltaVx += (averageVx - this.deltaVx) * this.properties.alignment;
-            this.deltaVy += (averageVy - this.deltaVy) * this.properties.alignment;
+            this.deltaVx += (averageVx - this.deltaVx) * this.worldProperties.alignment;
+            this.deltaVy += (averageVy - this.deltaVy) * this.worldProperties.alignment;
         }
 
         // avoid the mouse
-        if (this.properties.mouseAvoidance !== 0 && mousePosition) {
+        if (this.worldProperties.mouseAvoidance !== 0 && mousePosition) {
             // strength of avoidance is inversely proportional to distance
             const diffX = this.x - mousePosition.x;
             const diffY = this.y - mousePosition.y;
             const distanceSq = Math.max(1, square(diffX) + square(diffY));
 
-            this.deltaVx += diffX / distanceSq * this.properties.mouseAvoidance;
-            this.deltaVy += diffY / distanceSq * this.properties.mouseAvoidance;
+            this.deltaVx += diffX / distanceSq * this.worldProperties.mouseAvoidance;
+            this.deltaVy += diffY / distanceSq * this.worldProperties.mouseAvoidance;
 
         }
 
         // cap acceleration
         const deltaVMagnitude = Math.sqrt(square(this.deltaVx) + square(this.deltaVy));
-        if (deltaVMagnitude > this.properties.maxAcceleration) {
-            this.deltaVx *= this.properties.maxAcceleration / deltaVMagnitude;
-            this.deltaVy *= this.properties.maxAcceleration / deltaVMagnitude;
+        if (deltaVMagnitude > this.worldProperties.maxAcceleration) {
+            this.deltaVx *= this.worldProperties.maxAcceleration / deltaVMagnitude;
+            this.deltaVy *= this.worldProperties.maxAcceleration / deltaVMagnitude;
         }
 
         // update and cap velocity
@@ -234,12 +231,12 @@ class Boid {
         this.vy += this.deltaVy;
 
         const vMagnitude = Math.sqrt(square(this.vx) + square(this.vy));
-        if (vMagnitude > this.properties.maxSpeed) {
-            this.vx *= this.properties.maxSpeed / vMagnitude;
-            this.vy *= this.properties.maxSpeed / vMagnitude;
-        } else if (vMagnitude < this.properties.minSpeed && vMagnitude > 0) {
-            this.vx *= this.properties.minSpeed / vMagnitude;
-            this.vy *= this.properties.minSpeed / vMagnitude;
+        if (vMagnitude > this.worldProperties.maxSpeed) {
+            this.vx *= this.worldProperties.maxSpeed / vMagnitude;
+            this.vy *= this.worldProperties.maxSpeed / vMagnitude;
+        } else if (vMagnitude < this.worldProperties.minSpeed && vMagnitude > 0) {
+            this.vx *= this.worldProperties.minSpeed / vMagnitude;
+            this.vy *= this.worldProperties.minSpeed / vMagnitude;
         } // just going to ignore the === 0 case for now
         
         this.direction = Math.atan2(this.vy, this.vx);
@@ -387,7 +384,7 @@ class World {
                 continue;
             }
 
-            if (boidDistanceSq(boid, otherBoid) < square(boid.properties.awarenessRadius)) {
+            if (boidDistanceSq(boid, otherBoid) < square(this.properties.awarenessRadius)) {
                 nearBoids.push(otherBoid);
             }
         }
@@ -397,7 +394,7 @@ class World {
 
     getNearBoids(boid: Boid): Boid[] {   
         let nearBoids: Boid[] = [];
-        const awarenessRadius = boid.properties.awarenessRadius;
+        const awarenessRadius = this.properties.awarenessRadius;
         const sqAwarenessRadius = square(awarenessRadius);
 
         const minXBucket = this.xToBucket(boid.x - awarenessRadius);
@@ -437,7 +434,7 @@ let canvas = document.getElementsByTagName("canvas")[0];
 canvas.width = 1000;
 canvas.height = 800;    
 
-const world = new World(canvas, 2000, true, {continuousCohorts: false, circularBorder: true});
+const world = new World(canvas, 1000, true, {continuousCohorts: false, circularBorder: true});
 
 canvas.addEventListener("mousemove", (e) => {
     if (world.mousePosition === null) {
