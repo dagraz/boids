@@ -51,6 +51,7 @@ const DEFAULT_BOID_PROPERTIES: BoidProperties = {
 interface WorldProperties {
     width: number;
     height: number;
+    circularBorder: boolean;
     continuousCohorts: boolean;
     homogenousCohorts: boolean;
 };
@@ -58,6 +59,7 @@ interface WorldProperties {
 const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
     width: 1000,
     height: 800,
+    circularBorder: false,
     continuousCohorts: false,
     homogenousCohorts: true
 };
@@ -131,11 +133,25 @@ class Boid {
         this.deltaVy = 0;
 
         // avoid edges
-        this.deltaVx += this.edgeAvoidance(this.x);
-        this.deltaVx -= this.edgeAvoidance(this.worldProperties.width - this.x);
-        this.deltaVy += this.edgeAvoidance(this.y);
-        this.deltaVy -= this.edgeAvoidance(this.worldProperties.height - this.y);
-        
+        if (this.worldProperties.circularBorder) {
+            const centerWidth = 0.5 * this.worldProperties.width;
+            const centerHeight = 0.5 * this.worldProperties.height;
+            const distanceFromCenter = Math.sqrt(
+                square(this.x - centerWidth) + square(this.y - centerHeight));
+                
+            const distanceFromEdge = 0.5 * Math.min(this.worldProperties.width, this.worldProperties.height) - 
+                distanceFromCenter;
+            const edgeAvoidance = this.edgeAvoidance(distanceFromEdge);
+            this.deltaVx += edgeAvoidance * (centerWidth - this.x) / distanceFromCenter;
+            this.deltaVy += edgeAvoidance * (centerHeight - this.y) / distanceFromCenter;
+        } else {
+            // rectangular border
+            this.deltaVx += this.edgeAvoidance(this.x);
+            this.deltaVx -= this.edgeAvoidance(this.worldProperties.width - this.x);
+            this.deltaVy += this.edgeAvoidance(this.y);
+            this.deltaVy -= this.edgeAvoidance(this.worldProperties.height - this.y);
+        }
+
         let sumX = 0;
         let sumY = 0;
         let sumVx = 0;
@@ -266,13 +282,13 @@ class World {
     }
 
     constructor(canvas: HTMLCanvasElement, num_boids: number, 
-        public useSpaceBuckets: boolean, weightedCohorts: boolean = false) {
+        public useSpaceBuckets: boolean, wp: Partial<WorldProperties>) {
         this.canvas = canvas;
         this.context = canvas.getContext("2d", {alpha: false}) as CanvasRenderingContext2D;
         this.properties = {...WORLD_PROPERTIES_DEFAULT, 
             width: canvas.width,
             height: canvas.height,
-            continuousCohorts: weightedCohorts,
+            ...wp
         };
 
         this.mousePosition = null;
@@ -304,7 +320,8 @@ class World {
             let boidProperties: Partial<BoidProperties> = {};
             if (this.properties.continuousCohorts) {
                 boidProperties.cohort = 360 * Math.random();
-                boidProperties.color = `hsl(${boidProperties.cohort} 100% 50%)`;
+                //boidProperties.color = `hsl(${boidProperties.cohort} 100% 50%)`;
+                boidProperties.color = `hsl(${boidProperties.cohort} 80% 60%)`;
             } else {
                 const cohortSelector = Math.random();
                 if (cohortSelector < 0.5) {
@@ -420,7 +437,7 @@ let canvas = document.getElementsByTagName("canvas")[0];
 canvas.width = 1000;
 canvas.height = 800;    
 
-const world = new World(canvas, 1000, true, true);
+const world = new World(canvas, 2000, true, {continuousCohorts: false, circularBorder: true});
 
 canvas.addEventListener("mousemove", (e) => {
     if (world.mousePosition === null) {
