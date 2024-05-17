@@ -1,7 +1,7 @@
 // taking inspiration from: https://vanhunteradams.com/Pico/Animal_Movement/Boids-algorithm.html
 //
 // todo: 
-//  * move most Boid properties to World, and build a general mechanism for modifying at runtime
+//  * build a general mechanism for modifying world properties at runtime
 
 
 interface Position {
@@ -64,6 +64,18 @@ const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
     edgeAvoidance: 5,
 };
 
+function square(x: number): number {
+    return x * x;
+}
+
+function boidDistanceSq(boidA: Boid, boidB: Boid): number {
+    return square(boidA.x - boidB.x) + square(boidA.y - boidB.y);
+}
+
+function boidDistance(boidA: Boid, boidB: Boid): number {
+    return Math.sqrt(boidDistanceSq(boidA, boidB));
+}
+
 class Boid {
     constructor(public x: number, public y: number, speed: number, public direction: number, wp: WorldProperties,
         properties: Partial<BoidProperties>) {
@@ -85,20 +97,9 @@ class Boid {
     worldProperties: WorldProperties;
 
    public draw(context: CanvasRenderingContext2D) {
-        // turns out save/restore are a little pricey for how lightly this uses them.
-        // doing a cheap restore-by-hand shaves off some small but non-trivial CPU.
+        // turns out save/restore/rotate are a little pricey for how lightly this uses them.
+        // doing the equiv work by hand shaves off a non-trivial hunk of cpu time.
         context.translate(Math.floor(this.x), Math.floor(this.y));
-
-        // Also turns out rotate is weirdly expensive.  
-        // The shape is basic enough we'll do it by hand.
-        /*
-        context.rotate(this.direction);
-        context.beginPath();
-        context.moveTo(7, 0);
-        context.lineTo(0,3);
-        context.lineTo(0,-3);
-        context.closePath();
-        */
 
         const cos = Math.cos(this.direction);
         const sin = Math.sin(this.direction);
@@ -109,7 +110,6 @@ class Boid {
         context.lineTo(Math.floor(3 * sin), Math.floor(-3 * cos));
         context.closePath();
 
-
         context.fillStyle = this.properties.color;
         context.fill();
 
@@ -118,14 +118,14 @@ class Boid {
 
 
     edgeAvoidance(edgeDistance: number): number {
-        if (edgeDistance <= 0) {
+        if (edgeDistance <= 1) {
             return this.worldProperties.edgeAvoidance;
         } else {
             return this.worldProperties.edgeAvoidance / edgeDistance;
         }
     }
 
-    update(nearBoids: Boid[], mousePosition: Position | null) {
+    updateAcceleration(nearBoids: Boid[], mousePosition: Position | null) {
         this.deltaVx = 0;
         this.deltaVy = 0;
 
@@ -180,7 +180,7 @@ class Boid {
 
             // avoid each other
             // strength of avoidance is inversely proportional to distance
-            // (*not* the square of the distance!  dividing out by the non-squared distance 
+            // (*not* inversely proportional to the square of the distance!  dividing out by the non-squared distance 
             // gives you a unit-direction vector, so the magnitude would be invariant to the distance.)
             const distanceSq = Math.max(1, boidDistanceSq(this, otherBoid));
             const diffX = this.x - otherBoid.x;
@@ -225,11 +225,19 @@ class Boid {
             this.deltaVx *= this.worldProperties.maxAcceleration / deltaVMagnitude;
             this.deltaVy *= this.worldProperties.maxAcceleration / deltaVMagnitude;
         }
+    }
 
+    updatePosition() {
+        // distance = velocity * time + 1/2 * acceleration * time^2
+        this.x += this.vx + 0.5 * this.deltaVx;
+        this.y += this.vy + 0.5 * this.deltaVy;
+    }
+
+    updateVelocity() {
         // update and cap velocity
         this.vx += this.deltaVx;
         this.vy += this.deltaVy;
-
+        
         const vMagnitude = Math.sqrt(square(this.vx) + square(this.vy));
         if (vMagnitude > this.worldProperties.maxSpeed) {
             this.vx *= this.worldProperties.maxSpeed / vMagnitude;
@@ -238,22 +246,11 @@ class Boid {
             this.vx *= this.worldProperties.minSpeed / vMagnitude;
             this.vy *= this.worldProperties.minSpeed / vMagnitude;
         } // just going to ignore the === 0 case for now
-        
+                
         this.direction = Math.atan2(this.vy, this.vx);
     }
 }
 
-function square(x: number): number {
-    return x * x;
-}
-
-function boidDistanceSq(boidA: Boid, boidB: Boid): number {
-    return square(boidA.x - boidB.x) + square(boidA.y - boidB.y);
-}
-
-function boidDistance(boidA: Boid, boidB: Boid): number {
-    return Math.sqrt(boidDistanceSq(boidA, boidB));
-}
 
 class World {
     public canvas: HTMLCanvasElement;
@@ -364,9 +361,8 @@ class World {
         }
 
         for (let boid of this.boids) {
-            // distance = velocity * time + 1/2 * acceleration * time^2
-            boid.x += boid.vx + 0.5 * boid.deltaVx;
-            boid.y += boid.vy + 0.5 * boid.deltaVy;
+            boid.updatePosition();
+            boid.updateVelocity();
 
             if (this.useSpaceBuckets) {
                 const xBucket = this.xToBucket(boid.x);
@@ -425,7 +421,7 @@ class World {
                 this.getNearBoids(boid) :
                 this.getNearBoidsQuadratic(boid);
 
-            boid.update(nearBoids, this.mousePosition);
+            boid.updateAcceleration(nearBoids, this.mousePosition);
         }
     }
 }
@@ -434,7 +430,7 @@ let canvas = document.getElementsByTagName("canvas")[0];
 canvas.width = 1000;
 canvas.height = 800;    
 
-const world = new World(canvas, 1000, true, {continuousCohorts: false, circularBorder: true});
+const world = new World(canvas, 2000, true, {continuousCohorts: true, circularBorder: true, homogenousCohorts: true});
 
 canvas.addEventListener("mousemove", (e) => {
     if (world.mousePosition === null) {
