@@ -160,7 +160,7 @@ class Boid {
             if (this.worldProperties.continuousCohorts) {
                 const baseWeight = Math.min(
                     Math.abs(otherBoid.properties.cohort - this.properties.cohort),
-                    otherBoid.properties.cohort + (360 - this.properties.cohort)) / 180;
+                    360 - Math.abs(otherBoid.properties.cohort - this.properties.cohort)) / 180;
                 const weight = this.worldProperties.homogenousCohorts ?
                     1 - baseWeight :
                     baseWeight;
@@ -430,7 +430,7 @@ let canvas = document.getElementsByTagName("canvas")[0];
 canvas.width = 1000;
 canvas.height = 800;    
 
-const world = new World(canvas, 2000, true, {continuousCohorts: true, circularBorder: true, homogenousCohorts: true});
+const world = new World(canvas, 2000, true, {continuousCohorts: false, circularBorder: false, homogenousCohorts: false});
 
 canvas.addEventListener("mousemove", (e) => {
     if (world.mousePosition === null) {
