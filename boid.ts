@@ -11,11 +11,6 @@
 //  * tech debt:  weird that we have a position interface and almost never use it.  get rid of it or use it deeply.
 
 
-interface Position {
-    x: number;
-    y: number;
-}
-
 interface BoidProperties {
     color: string;
     cohort: number;
@@ -142,7 +137,7 @@ class Boid {
         }
     }
 
-    updateAcceleration(nearBoids: Boid[], mousePosition: Position | null) {
+    updateAcceleration(nearBoids: Boid[], mousePosition: {x: number, y: number} | null) {
         this.deltaVx = 0;
         this.deltaVy = 0;
 
@@ -277,7 +272,7 @@ class World {
     properties: WorldProperties;
     cohortProperties: CohortProperties;
 
-    mousePosition: Position | null;
+    mousePosition: {x: number, y: number} | null;
 
     spaceBuckets: Boid[][][];
     bucketXSize: number;
@@ -462,7 +457,7 @@ const world = new World(canvas, 2000, true,
 
 canvas.addEventListener("mousemove", (e) => {
     if (world.mousePosition === null) {
-        world.mousePosition = {x: 0, y: 0} as Position;
+        world.mousePosition = {x: 0, y: 0};
     }
     world.mousePosition.x = e.clientX;
     world.mousePosition.y = e.clientY;
@@ -520,7 +515,7 @@ label.appendChild(input);
 controlPanel.appendChild(label);
 
 input.addEventListener("change", () => {
-    // todo: checkthe input
+    // todo: check for NaN, negative numbers.  fall back to default
     world.properties.cohesion = parseFloat(input.value);
     console.log(input.value);
     console.log(world.properties.cohesion);
