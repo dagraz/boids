@@ -2,6 +2,8 @@
 //
 // todo: 
 //  * build a general mechanism for modifying world properties at runtime
+//    * extract cohort setting to separate function
+//    * write a general re-cohort method
 //  * 3d!
 //  * autosize canvasto visible space
 //  * I bet draw can be made leaner.  experiment with pre-rendering ~100 boids at different rotations and use canvas.drawImage
@@ -24,12 +26,22 @@ const DEFAULT_BOID_PROPERTIES: BoidProperties = {
     cohort: 0,
 };
 
+interface CohortProperties {
+    continuousCohorts: boolean;
+    homogenousCohorts: boolean;
+    colors: string[];
+}
+
+const DEFAULT_COHORT_PROPERTIES: CohortProperties = {
+    continuousCohorts: false,
+    homogenousCohorts: true,
+    colors: ["red", "blue",],
+}
+
 interface WorldProperties {
     width: number;
     height: number;
     circularBorder: boolean;
-    continuousCohorts: boolean;
-    homogenousCohorts: boolean;
 
     // Global parameters for boid behavior
     minSpeed: number;
@@ -55,8 +67,6 @@ const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
     width: 1000,
     height: 800,
     circularBorder: false,
-    continuousCohorts: false,
-    homogenousCohorts: true,
 
     minSpeed: 0.5,
     maxSpeed: 2,
@@ -83,13 +93,14 @@ function boidDistance(boidA: Boid, boidB: Boid): number {
 
 class Boid {
     constructor(public x: number, public y: number, speed: number, public direction: number, wp: WorldProperties,
-        properties: Partial<BoidProperties>) {
+        cohortProperties: CohortProperties, properties: Partial<BoidProperties>) {
         this.vx = speed * Math.cos(direction);
         this.vy = speed * Math.sin(direction);
         this.deltaVx = 0;
         this.deltaVy = 0;
 
         this.properties = {...DEFAULT_BOID_PROPERTIES, ...properties };
+        this.cohortProperties = cohortProperties;
         this.worldProperties = wp;
     }
 
@@ -99,6 +110,7 @@ class Boid {
     deltaVy: number;
 
     properties: BoidProperties;
+    cohortProperties: CohortProperties;
     worldProperties: WorldProperties;
 
    public draw(context: CanvasRenderingContext2D) {
@@ -162,11 +174,11 @@ class Boid {
         
         for (const otherBoid of nearBoids) {
             // Boids will only cohere and align with members of the same cohort
-            if (this.worldProperties.continuousCohorts) {
+            if (this.cohortProperties.continuousCohorts) {
                 const baseWeight = Math.min(
                     Math.abs(otherBoid.properties.cohort - this.properties.cohort),
                     360 - Math.abs(otherBoid.properties.cohort - this.properties.cohort)) / 180;
-                const weight = this.worldProperties.homogenousCohorts ?
+                const weight = this.cohortProperties.homogenousCohorts ?
                     1 - baseWeight :
                     baseWeight;
                 
@@ -263,6 +275,7 @@ class World {
     public boids: Boid[];
 
     properties: WorldProperties;
+    cohortProperties: CohortProperties;
 
     mousePosition: Position | null;
 
@@ -281,7 +294,9 @@ class World {
     }
 
     constructor(canvas: HTMLCanvasElement, numBoids: number, 
-        public useSpaceBuckets: boolean, wp: Partial<WorldProperties>) {
+        public useSpaceBuckets: boolean, wp: Partial<WorldProperties>, 
+        cp: Partial<CohortProperties>) {
+
         this.canvas = canvas;
         this.context = canvas.getContext("2d", {alpha: false}) as CanvasRenderingContext2D;
         this.properties = {...WORLD_PROPERTIES_DEFAULT, 
@@ -289,7 +304,7 @@ class World {
             height: canvas.height,
             ...wp
         };
-
+        this.cohortProperties = {...DEFAULT_COHORT_PROPERTIES, ...cp};
         this.mousePosition = null;
 
         this.bucketXSize = 50;
@@ -321,21 +336,20 @@ class World {
     updateNumBoids(numBoids: number) {
         while (this.boids.length < numBoids) {
             let boidProperties: Partial<BoidProperties> = {};
-            if (this.properties.continuousCohorts) {
+            if (this.cohortProperties.continuousCohorts) {
                 boidProperties.cohort = 360 * Math.random();
                 //boidProperties.color = `hsl(${boidProperties.cohort} 100% 50%)`;
                 boidProperties.color = `hsl(${boidProperties.cohort} 80% 60%)`;
             } else {
-                const cohortSelector = Math.random();
-                if (cohortSelector < 0.5) {
-                    boidProperties.cohort = 1;
-                    boidProperties.color = "blue";
-                }
+                const cohort = Math.floor(this.cohortProperties.colors.length * Math.random());
+                boidProperties.cohort = cohort;
+                boidProperties.color = this.cohortProperties.colors[cohort];
             }
+
             const boid = new Boid(
                 (Math.random() * 0.8 + 0.1) * this.properties.width,
                 (Math.random() * 0.8 + 0.1) * this.properties.height,
-                1, Math.random() * 2 * Math.PI, this.properties, boidProperties);
+                1, Math.random() * 2 * Math.PI, this.properties, this.cohortProperties, boidProperties);
 
             this.boids.push(boid);
 
@@ -443,7 +457,8 @@ let canvas = document.getElementsByTagName("canvas")[0];
 canvas.width = 1000;
 canvas.height = 800;    
 
-const world = new World(canvas, 2000, true, {continuousCohorts: false, circularBorder: false, homogenousCohorts: true});
+const world = new World(canvas, 2000, true, 
+    {circularBorder: false, }, {continuousCohorts: false, homogenousCohorts: true, });
 
 canvas.addEventListener("mousemove", (e) => {
     if (world.mousePosition === null) {
@@ -465,7 +480,7 @@ canvas.addEventListener("click", (e) => {
         window.cancelAnimationFrame(raf);
         running = false;
     } else {
-        window.requestAnimationFrame(cycle);
+        raf = window.requestAnimationFrame(cycle);
         running = true;
     }
 });
@@ -484,11 +499,31 @@ borderType.addEventListener("change", (evt) => {
 });
 
 const numBoidsInput = document.querySelector("[name=numBoids]") as HTMLInputElement;
-numBoidsInput.value = world.boids.length.toLocaleString();
+numBoidsInput.value = world.boids.length.toString();
 numBoidsInput.addEventListener("change", (evt) => {
-    console.log(numBoidsInput.value);
     world.updateNumBoids(parseInt(numBoidsInput.value));
     return false;
+});
+
+const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
+
+// Proof of concept for creating a property input from code.
+const input = document.createElement('input') as HTMLInputElement;
+input.setAttribute('type', 'number');
+input.setAttribute('name', 'cohesion');
+input.setAttribute('value', world.properties.cohesion.toString());
+
+const label = document.createElement('label');
+label.innerHTML = "cohesion";
+label.appendChild(input);
+
+controlPanel.appendChild(label);
+
+input.addEventListener("change", () => {
+    // todo: checkthe input
+    world.properties.cohesion = parseFloat(input.value);
+    console.log(input.value);
+    console.log(world.properties.cohesion);
 });
 
 cycle();
