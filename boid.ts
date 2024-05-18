@@ -5,10 +5,9 @@
 //    * extract cohort setting to separate function
 //    * write a general re-cohort method
 //  * 3d!
-//  * autosize canvasto visible space
+//  * autosize canvas to visible space
 //  * I bet draw can be made leaner.  experiment with pre-rendering ~100 boids at different rotations and use canvas.drawImage
 //  * better understand heap usage.  there is a *lot* of churn in there, it should be possible for there to be almost none.
-//  * tech debt:  weird that we have a position interface and almost never use it.  get rid of it or use it deeply.
 
 
 interface BoidProperties {
