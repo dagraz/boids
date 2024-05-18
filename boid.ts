@@ -2,6 +2,11 @@
 //
 // todo: 
 //  * build a general mechanism for modifying world properties at runtime
+//  * 3d!
+//  * autosize canvasto visible space
+//  * I bet draw can be made leaner.  experiment with pre-rendering ~100 boids at different rotations and use canvas.drawImage
+//  * better understand heap usage.  there is a *lot* of churn in there, it should be possible for there to be almost none.
+//  * tech debt:  weird that we have a position interface and almost never use it.  get rid of it or use it deeply.
 
 
 interface Position {
@@ -275,7 +280,7 @@ class World {
         return Math.floor(cleanY / this.bucketYSize);
     }
 
-    constructor(canvas: HTMLCanvasElement, num_boids: number, 
+    constructor(canvas: HTMLCanvasElement, numBoids: number, 
         public useSpaceBuckets: boolean, wp: Partial<WorldProperties>) {
         this.canvas = canvas;
         this.context = canvas.getContext("2d", {alpha: false}) as CanvasRenderingContext2D;
@@ -310,7 +315,11 @@ class World {
 
         this.boids = []
 
-        while (this.boids.length < num_boids) {
+        this.updateNumBoids(numBoids);
+    }
+
+    updateNumBoids(numBoids: number) {
+        while (this.boids.length < numBoids) {
             let boidProperties: Partial<BoidProperties> = {};
             if (this.properties.continuousCohorts) {
                 boidProperties.cohort = 360 * Math.random();
@@ -330,11 +339,15 @@ class World {
 
             this.boids.push(boid);
 
-            if (useSpaceBuckets) {
+            if (this.useSpaceBuckets) {
                 const xBucket = this.xToBucket(boid.x);
                 const yBucket = this.yToBucket(boid.y);
                 this.spaceBuckets[xBucket][yBucket].push(boid);
             }
+        }
+
+        if (this.boids.length > numBoids) {
+            this.boids.length = numBoids;
         }
     }
 
@@ -430,7 +443,7 @@ let canvas = document.getElementsByTagName("canvas")[0];
 canvas.width = 1000;
 canvas.height = 800;    
 
-const world = new World(canvas, 2000, true, {continuousCohorts: false, circularBorder: false, homogenousCohorts: false});
+const world = new World(canvas, 2000, true, {continuousCohorts: false, circularBorder: false, homogenousCohorts: true});
 
 canvas.addEventListener("mousemove", (e) => {
     if (world.mousePosition === null) {
@@ -464,5 +477,18 @@ function cycle() {
 
     raf = window.requestAnimationFrame(cycle)
 }
+
+const borderType = document.querySelector("[name=borderType]") as HTMLInputElement;
+borderType.addEventListener("change", (evt) => {
+    world.properties.circularBorder = borderType.checked;
+});
+
+const numBoidsInput = document.querySelector("[name=numBoids]") as HTMLInputElement;
+numBoidsInput.value = world.boids.length.toLocaleString();
+numBoidsInput.addEventListener("change", (evt) => {
+    console.log(numBoidsInput.value);
+    world.updateNumBoids(parseInt(numBoidsInput.value));
+    return false;
+});
 
 cycle();
