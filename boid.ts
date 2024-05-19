@@ -4,35 +4,32 @@
 //  * build a general mechanism for modifying world properties at runtime
 //    * extract cohort setting to separate function
 //    * write a general re-cohort method
+//    * s/boidProperties/boidCohortProperties/
+//    * extract boid properties from WorldProperties
 //  * 3d!
 //  * autosize canvas to visible space
 //  * I bet draw can be made leaner.  experiment with pre-rendering ~100 boids at different rotations and use canvas.drawImage
 //  * better understand heap usage.  there is a *lot* of churn in there, it should be possible for there to be almost none.
 
 
-interface BoidProperties {
+interface CohortProperties {
     color: string;
     cohort: number;
 }
 
-const DEFAULT_BOID_PROPERTIES: BoidProperties = {
-    color: "red",
-    cohort: 0,
-};
-
-interface CohortProperties {
+interface CohortSetup {
     continuousCohorts: boolean;
     homogenousCohorts: boolean;
     colors: string[];
 }
 
-const DEFAULT_COHORT_PROPERTIES: CohortProperties = {
+const DEFAULT_COHORT_SETUP: CohortSetup = {
     continuousCohorts: false,
     homogenousCohorts: true,
     colors: ["red", "blue",],
 }
 
-interface WorldProperties {
+interface BoidProperties {
     width: number;
     height: number;
     circularBorder: boolean;
@@ -55,9 +52,11 @@ interface WorldProperties {
     mouseAvoidance: number;
 
     edgeAvoidance: number;
+
+    [index:string]: number | boolean;
 };
 
-const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
+const BOID_PROPERTIES_DEFAULT: BoidProperties = {
     width: 1000,
     height: 800,
     circularBorder: false,
@@ -86,16 +85,17 @@ function boidDistance(boidA: Boid, boidB: Boid): number {
 }
 
 class Boid {
-    constructor(public x: number, public y: number, speed: number, public direction: number, wp: WorldProperties,
-        cohortProperties: CohortProperties, properties: Partial<BoidProperties>) {
+    constructor(public x: number, public y: number, speed: number, public direction: number, 
+        boidProperties: BoidProperties, cohortProperties: CohortSetup, properties: CohortProperties) {
+        
         this.vx = speed * Math.cos(direction);
         this.vy = speed * Math.sin(direction);
         this.deltaVx = 0;
         this.deltaVy = 0;
 
-        this.properties = {...DEFAULT_BOID_PROPERTIES, ...properties };
-        this.cohortProperties = cohortProperties;
-        this.worldProperties = wp;
+        this.cohortProperties = properties;
+        this.cohortSetup = cohortProperties;
+        this.boidProperties = boidProperties;
     }
 
     vx: number;
@@ -103,11 +103,11 @@ class Boid {
     deltaVx: number;
     deltaVy: number;
 
-    properties: BoidProperties;
     cohortProperties: CohortProperties;
-    worldProperties: WorldProperties;
+    cohortSetup: CohortSetup;
+    boidProperties: BoidProperties;
 
-   public draw(context: CanvasRenderingContext2D) {
+    public draw(context: CanvasRenderingContext2D) {
         // turns out save/restore/rotate are a little pricey for how lightly this uses them.
         // doing the equiv work by hand shaves off a non-trivial hunk of cpu time.
         context.translate(Math.floor(this.x), Math.floor(this.y));
@@ -121,7 +121,7 @@ class Boid {
         context.lineTo(Math.floor(3 * sin), Math.floor(-3 * cos));
         context.closePath();
 
-        context.fillStyle = this.properties.color;
+        context.fillStyle = this.cohortProperties.color;
         context.fill();
 
         context.translate(-Math.floor(this.x), -Math.floor(this.y));
@@ -130,9 +130,9 @@ class Boid {
 
     edgeAvoidance(edgeDistance: number): number {
         if (edgeDistance <= 1) {
-            return this.worldProperties.edgeAvoidance;
+            return this.boidProperties.edgeAvoidance;
         } else {
-            return this.worldProperties.edgeAvoidance / edgeDistance;
+            return this.boidProperties.edgeAvoidance / edgeDistance;
         }
     }
 
@@ -141,13 +141,13 @@ class Boid {
         this.deltaVy = 0;
 
         // avoid edges
-        if (this.worldProperties.circularBorder) {
-            const centerWidth = 0.5 * this.worldProperties.width;
-            const centerHeight = 0.5 * this.worldProperties.height;
+        if (this.boidProperties.circularBorder) {
+            const centerWidth = 0.5 * this.boidProperties.width;
+            const centerHeight = 0.5 * this.boidProperties.height;
             const distanceFromCenter = Math.sqrt(
                 square(this.x - centerWidth) + square(this.y - centerHeight));
                 
-            const distanceFromEdge = 0.5 * Math.min(this.worldProperties.width, this.worldProperties.height) - 
+            const distanceFromEdge = 0.5 * Math.min(this.boidProperties.width, this.boidProperties.height) - 
                 distanceFromCenter;
             const edgeAvoidance = this.edgeAvoidance(distanceFromEdge);
             this.deltaVx += edgeAvoidance * (centerWidth - this.x) / distanceFromCenter;
@@ -155,9 +155,9 @@ class Boid {
         } else {
             // rectangular border
             this.deltaVx += this.edgeAvoidance(this.x);
-            this.deltaVx -= this.edgeAvoidance(this.worldProperties.width - this.x);
+            this.deltaVx -= this.edgeAvoidance(this.boidProperties.width - this.x);
             this.deltaVy += this.edgeAvoidance(this.y);
-            this.deltaVy -= this.edgeAvoidance(this.worldProperties.height - this.y);
+            this.deltaVy -= this.edgeAvoidance(this.boidProperties.height - this.y);
         }
 
         let sumX = 0;
@@ -168,11 +168,11 @@ class Boid {
         
         for (const otherBoid of nearBoids) {
             // Boids will only cohere and align with members of the same cohort
-            if (this.cohortProperties.continuousCohorts) {
+            if (this.cohortSetup.continuousCohorts) {
                 const baseWeight = Math.min(
-                    Math.abs(otherBoid.properties.cohort - this.properties.cohort),
-                    360 - Math.abs(otherBoid.properties.cohort - this.properties.cohort)) / 180;
-                const weight = this.cohortProperties.homogenousCohorts ?
+                    Math.abs(otherBoid.cohortProperties.cohort - this.cohortProperties.cohort),
+                    360 - Math.abs(otherBoid.cohortProperties.cohort - this.cohortProperties.cohort)) / 180;
+                const weight = this.cohortSetup.homogenousCohorts ?
                     1 - baseWeight :
                     baseWeight;
                 
@@ -181,7 +181,7 @@ class Boid {
                 sumVx += otherBoid.vx * weight;
                 sumVy += otherBoid.vy * weight;
                 numBoids += weight;
-            } else if (otherBoid.properties.cohort === this.properties.cohort) {
+            } else if (otherBoid.cohortProperties.cohort === this.cohortProperties.cohort) {
                 sumX += otherBoid.x;
                 sumY += otherBoid.y;
                 sumVx += otherBoid.vx;
@@ -197,8 +197,8 @@ class Boid {
             const diffX = this.x - otherBoid.x;
             const diffY = this.y - otherBoid.y;
 
-            this.deltaVx += diffX / distanceSq * this.worldProperties.separation;
-            this.deltaVy += diffY / distanceSq * this.worldProperties.separation;
+            this.deltaVx += diffX / distanceSq * this.boidProperties.separation;
+            this.deltaVy += diffY / distanceSq * this.boidProperties.separation;
         }
 
         if (numBoids > 0) {
@@ -206,35 +206,35 @@ class Boid {
             // Note the strength of the cohesive impulse is directly proportional to the distance from the center
             const averageX = sumX / numBoids;
             const averageY = sumY / numBoids;
-            this.deltaVx += (averageX - this.x) * this.worldProperties.cohesion;
-            this.deltaVy += (averageY - this.y) * this.worldProperties.cohesion;
+            this.deltaVx += (averageX - this.x) * this.boidProperties.cohesion;
+            this.deltaVy += (averageY - this.y) * this.boidProperties.cohesion;
 
             // Alignment
             // Note the strength of the cohesive impulse is directly proportional to the magnitude of the misalignment
             const averageVx = sumVx / numBoids;
             const averageVy = sumVy / numBoids;
 
-            this.deltaVx += (averageVx - this.deltaVx) * this.worldProperties.alignment;
-            this.deltaVy += (averageVy - this.deltaVy) * this.worldProperties.alignment;
+            this.deltaVx += (averageVx - this.deltaVx) * this.boidProperties.alignment;
+            this.deltaVy += (averageVy - this.deltaVy) * this.boidProperties.alignment;
         }
 
         // avoid the mouse
-        if (this.worldProperties.mouseAvoidance !== 0 && mousePosition) {
+        if (this.boidProperties.mouseAvoidance !== 0 && mousePosition) {
             // strength of avoidance is inversely proportional to distance
             const diffX = this.x - mousePosition.x;
             const diffY = this.y - mousePosition.y;
             const distanceSq = Math.max(1, square(diffX) + square(diffY));
 
-            this.deltaVx += diffX / distanceSq * this.worldProperties.mouseAvoidance;
-            this.deltaVy += diffY / distanceSq * this.worldProperties.mouseAvoidance;
+            this.deltaVx += diffX / distanceSq * this.boidProperties.mouseAvoidance;
+            this.deltaVy += diffY / distanceSq * this.boidProperties.mouseAvoidance;
 
         }
 
         // cap acceleration
         const deltaVMagnitude = Math.sqrt(square(this.deltaVx) + square(this.deltaVy));
-        if (deltaVMagnitude > this.worldProperties.maxAcceleration) {
-            this.deltaVx *= this.worldProperties.maxAcceleration / deltaVMagnitude;
-            this.deltaVy *= this.worldProperties.maxAcceleration / deltaVMagnitude;
+        if (deltaVMagnitude > this.boidProperties.maxAcceleration) {
+            this.deltaVx *= this.boidProperties.maxAcceleration / deltaVMagnitude;
+            this.deltaVy *= this.boidProperties.maxAcceleration / deltaVMagnitude;
         }
     }
 
@@ -250,12 +250,12 @@ class Boid {
         this.vy += this.deltaVy;
         
         const vMagnitude = Math.sqrt(square(this.vx) + square(this.vy));
-        if (vMagnitude > this.worldProperties.maxSpeed) {
-            this.vx *= this.worldProperties.maxSpeed / vMagnitude;
-            this.vy *= this.worldProperties.maxSpeed / vMagnitude;
-        } else if (vMagnitude < this.worldProperties.minSpeed && vMagnitude > 0) {
-            this.vx *= this.worldProperties.minSpeed / vMagnitude;
-            this.vy *= this.worldProperties.minSpeed / vMagnitude;
+        if (vMagnitude > this.boidProperties.maxSpeed) {
+            this.vx *= this.boidProperties.maxSpeed / vMagnitude;
+            this.vy *= this.boidProperties.maxSpeed / vMagnitude;
+        } else if (vMagnitude < this.boidProperties.minSpeed && vMagnitude > 0) {
+            this.vx *= this.boidProperties.minSpeed / vMagnitude;
+            this.vy *= this.boidProperties.minSpeed / vMagnitude;
         } // just going to ignore the === 0 case for now
                 
         this.direction = Math.atan2(this.vy, this.vx);
@@ -268,8 +268,12 @@ class World {
     public context: CanvasRenderingContext2D;
     public boids: Boid[];
 
-    properties: WorldProperties;
-    cohortProperties: CohortProperties;
+    //boidProperties: BoidProperties;
+    boidProperties: {
+        [Property in keyof BoidProperties]: BoidProperties[Property];
+    };
+
+    cohortProperties: CohortSetup;
 
     mousePosition: {x: number, y: number} | null;
 
@@ -278,27 +282,27 @@ class World {
     bucketYSize: number;
 
     xToBucket(x: number): number {
-        const cleanX = Math.min(this.properties.width, Math.max(0, x));
+        const cleanX = Math.min(this.boidProperties.width, Math.max(0, x));
         return Math.floor(cleanX / this.bucketXSize);
     }
 
     yToBucket(y: number): number {
-        const cleanY = Math.min(this.properties.height, Math.max(0, y));
+        const cleanY = Math.min(this.boidProperties.height, Math.max(0, y));
         return Math.floor(cleanY / this.bucketYSize);
     }
 
     constructor(canvas: HTMLCanvasElement, numBoids: number, 
-        public useSpaceBuckets: boolean, wp: Partial<WorldProperties>, 
-        cp: Partial<CohortProperties>) {
+        public useSpaceBuckets: boolean, boidProperties: Partial<BoidProperties>, 
+        cp: Partial<CohortSetup>) {
 
         this.canvas = canvas;
         this.context = canvas.getContext("2d", {alpha: false}) as CanvasRenderingContext2D;
-        this.properties = {...WORLD_PROPERTIES_DEFAULT, 
+        this.boidProperties = {...BOID_PROPERTIES_DEFAULT, 
             width: canvas.width,
             height: canvas.height,
-            ...wp
+            ...boidProperties
         };
-        this.cohortProperties = {...DEFAULT_COHORT_PROPERTIES, ...cp};
+        this.cohortProperties = {...DEFAULT_COHORT_SETUP, ...cp};
         this.mousePosition = null;
 
         this.bucketXSize = 50;
@@ -329,7 +333,7 @@ class World {
 
     updateNumBoids(numBoids: number) {
         while (this.boids.length < numBoids) {
-            let boidProperties: Partial<BoidProperties> = {};
+            let boidProperties: CohortProperties = {cohort: 0, color: "red"};
             if (this.cohortProperties.continuousCohorts) {
                 boidProperties.cohort = 360 * Math.random();
                 //boidProperties.color = `hsl(${boidProperties.cohort} 100% 50%)`;
@@ -341,9 +345,9 @@ class World {
             }
 
             const boid = new Boid(
-                (Math.random() * 0.8 + 0.1) * this.properties.width,
-                (Math.random() * 0.8 + 0.1) * this.properties.height,
-                1, Math.random() * 2 * Math.PI, this.properties, this.cohortProperties, boidProperties);
+                (Math.random() * 0.8 + 0.1) * this.boidProperties.width,
+                (Math.random() * 0.8 + 0.1) * this.boidProperties.height,
+                1, Math.random() * 2 * Math.PI, this.boidProperties, this.cohortProperties, boidProperties);
 
             this.boids.push(boid);
 
@@ -401,7 +405,7 @@ class World {
                 continue;
             }
 
-            if (boidDistanceSq(boid, otherBoid) < square(this.properties.awarenessRadius)) {
+            if (boidDistanceSq(boid, otherBoid) < square(this.boidProperties.awarenessRadius)) {
                 nearBoids.push(otherBoid);
             }
         }
@@ -411,7 +415,7 @@ class World {
 
     getNearBoids(boid: Boid): Boid[] {   
         let nearBoids: Boid[] = [];
-        const awarenessRadius = this.properties.awarenessRadius;
+        const awarenessRadius = this.boidProperties.awarenessRadius;
         const sqAwarenessRadius = square(awarenessRadius);
 
         const minXBucket = this.xToBucket(boid.x - awarenessRadius);
@@ -489,7 +493,7 @@ function cycle() {
 
 const borderType = document.querySelector("[name=borderType]") as HTMLInputElement;
 borderType.addEventListener("change", (evt) => {
-    world.properties.circularBorder = borderType.checked;
+    world.boidProperties.circularBorder = borderType.checked;
 });
 
 const numBoidsInput = document.querySelector("[name=numBoids]") as HTMLInputElement;
@@ -501,11 +505,36 @@ numBoidsInput.addEventListener("change", (evt) => {
 
 const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
 
+for (const [key, value] of Object.entries(world.boidProperties)) {
+    if (typeof world.boidProperties[key] === "number") {
+        const input = document.createElement('input') as HTMLInputElement;
+        input.setAttribute('type', 'number');
+        input.setAttribute('name', key);
+        input.setAttribute('value', value.toString());
+        
+        const label = document.createElement('label');
+        label.innerHTML = key;
+        label.appendChild(input);
+        
+        controlPanel.appendChild(label);
+        
+        input.addEventListener("change", () => {
+            // todo: check for NaN, negative numbers.  fall back to default
+            
+            world.boidProperties[key] = parseFloat(input.value);
+            console.log(input.value);
+            console.log(world.boidProperties.cohesion);
+        });
+        
+    }    
+}
+
+/*
 // Proof of concept for creating a property input from code.
 const input = document.createElement('input') as HTMLInputElement;
 input.setAttribute('type', 'number');
 input.setAttribute('name', 'cohesion');
-input.setAttribute('value', world.properties.cohesion.toString());
+input.setAttribute('value', world.boidProperties.cohesion.toString());
 
 const label = document.createElement('label');
 label.innerHTML = "cohesion";
@@ -515,9 +544,10 @@ controlPanel.appendChild(label);
 
 input.addEventListener("change", () => {
     // todo: check for NaN, negative numbers.  fall back to default
-    world.properties.cohesion = parseFloat(input.value);
+    world.boidProperties.cohesion = parseFloat(input.value);
     console.log(input.value);
-    console.log(world.properties.cohesion);
+    console.log(world.boidProperties.cohesion);
 });
+*/
 
 cycle();
