@@ -1,11 +1,14 @@
-// taking inspiration from: https://vanhunteradams.com/Pico/Animal_Movement/Boids-algorithm.html
+// taking inspiration from: 
+//  * https://dl.acm.org/doi/10.1145/280811.281008
+
+//  * https://vanhunteradams.com/Pico/Animal_Movement/Boids-algorithm.html
 //
 // todo: 
 //  * build a general mechanism for modifying world properties at runtime
 //    * extract cohort setting to separate function
 //    * write a general re-cohort method
-//    * s/boidProperties/boidCohortProperties/
-//    * extract boid properties from WorldProperties
+//    * move screen res stuff to separate properties struct
+//    * support for custom functions on mutation (e.g. changing number of boids, cohort properties)
 //  * 3d!
 //  * autosize canvas to visible space
 //  * I bet draw can be made leaner.  experiment with pre-rendering ~100 boids at different rotations and use canvas.drawImage
@@ -491,11 +494,6 @@ function cycle() {
     raf = window.requestAnimationFrame(cycle)
 }
 
-const borderType = document.querySelector("[name=borderType]") as HTMLInputElement;
-borderType.addEventListener("change", (evt) => {
-    world.boidProperties.circularBorder = borderType.checked;
-});
-
 const numBoidsInput = document.querySelector("[name=numBoids]") as HTMLInputElement;
 numBoidsInput.value = world.boids.length.toString();
 numBoidsInput.addEventListener("change", (evt) => {
@@ -506,48 +504,30 @@ numBoidsInput.addEventListener("change", (evt) => {
 const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
 
 for (const [key, value] of Object.entries(world.boidProperties)) {
+    const input = document.createElement('input') as HTMLInputElement;
+    input.setAttribute('name', key);
+    input.setAttribute('value', value.toString());
+
     if (typeof world.boidProperties[key] === "number") {
-        const input = document.createElement('input') as HTMLInputElement;
         input.setAttribute('type', 'number');
-        input.setAttribute('name', key);
-        input.setAttribute('value', value.toString());
+    } else if (typeof world.boidProperties[key] === "boolean") {
+        input.setAttribute('type', 'checkbox');
+    }
         
-        const label = document.createElement('label');
-        label.innerHTML = key;
-        label.appendChild(input);
+    const label = document.createElement('label');
+    label.innerHTML = key;
+    label.appendChild(input);
         
-        controlPanel.appendChild(label);
+    controlPanel.appendChild(label);
         
-        input.addEventListener("change", () => {
-            // todo: check for NaN, negative numbers.  fall back to default
-            
-            world.boidProperties[key] = parseFloat(input.value);
-            console.log(input.value);
-            console.log(world.boidProperties.cohesion);
-        });
-        
-    }    
+    input.addEventListener("change", () => {
+        // todo: check for NaN, negative numbers.  fall back to default
+        if (typeof world.boidProperties[key] === "number") {
+            world.boidProperties[key] = parseFloat(input.value);    
+        } else if (typeof world.boidProperties[key] === "boolean") {
+            world.boidProperties[key] = input.checked;
+        }
+    });
 }
-
-/*
-// Proof of concept for creating a property input from code.
-const input = document.createElement('input') as HTMLInputElement;
-input.setAttribute('type', 'number');
-input.setAttribute('name', 'cohesion');
-input.setAttribute('value', world.boidProperties.cohesion.toString());
-
-const label = document.createElement('label');
-label.innerHTML = "cohesion";
-label.appendChild(input);
-
-controlPanel.appendChild(label);
-
-input.addEventListener("change", () => {
-    // todo: check for NaN, negative numbers.  fall back to default
-    world.boidProperties.cohesion = parseFloat(input.value);
-    console.log(input.value);
-    console.log(world.boidProperties.cohesion);
-});
-*/
 
 cycle();
