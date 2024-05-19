@@ -523,7 +523,9 @@ for (const [key, value] of Object.entries(world.boidProperties)) {
     input.addEventListener("change", () => {
         // todo: check for NaN, negative numbers.  fall back to default
         if (typeof world.boidProperties[key] === "number") {
-            world.boidProperties[key] = parseFloat(input.value);    
+            const value = parseFloat(input.value);
+            world.boidProperties[key] = isNaN(value) ?
+                BOID_PROPERTIES_DEFAULT[key] : value;
         } else if (typeof world.boidProperties[key] === "boolean") {
             world.boidProperties[key] = input.checked;
         }
