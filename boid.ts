@@ -7,13 +7,13 @@
 //  * build a general mechanism for modifying world properties at runtime
 //    * move screen res stuff to separate properties struct
 //    * allow for per-field data validation and conversion (e.g. float vs int, positive values, etc)
-//    * fix default state of checkboxes
 //  * 3d!
 //  * autosize canvas to visible space
 //  * I bet draw can be made leaner.  experiment with pre-rendering ~100 boids at different rotations and use canvas.drawImage
 //  * better understand heap usage.  there is a *lot* of churn in there, it should be possible for there to be almost none.
 //  * inverse-distance is very strong.  Try inverse-squares for boid+edge avoidance
-
+//
+// When using inverseSquare avoidance, drop cohesion by an order of magnitude and double seperation.
 
 interface IndexableProperties {
     [index:string]: number | boolean | string;
@@ -60,8 +60,9 @@ interface BoidProperties extends IndexableProperties {
 
     // Flee or chase the mouse pointer.  
     mouseAvoidance: number;
-
     edgeAvoidance: number;
+
+    inverseSquareAvoidance: boolean;
 };
 
 const BOID_PROPERTIES_DEFAULT: BoidProperties = {
@@ -78,6 +79,7 @@ const BOID_PROPERTIES_DEFAULT: BoidProperties = {
     alignment: 0.025,
     mouseAvoidance: 5,
     edgeAvoidance: 5,
+    inverseSquareAvoidance: false
 };
 
 function square(x: number): number {
@@ -140,11 +142,15 @@ class Boid {
         if (edgeDistance <= 1) {
             return this.boidProperties.edgeAvoidance;
         } else {
-            return this.boidProperties.edgeAvoidance / edgeDistance;
+            if (this.boidProperties.inverseSquareAvoidance) {
+                return this.boidProperties.edgeAvoidance / edgeDistance / edgeDistance;
+            } else {
+                return this.boidProperties.edgeAvoidance / edgeDistance;
+            }
         }
     }
 
-    updateAcceleration(nearBoids: Boid[], mousePosition: {x: number, y: number} | null) {
+    updateAcceleration(nearBoids: [boid: Boid, distanceSq: number][], mousePosition: {x: number, y: number} | null) {
         this.deltaVx = 0;
         this.deltaVy = 0;
 
@@ -174,7 +180,7 @@ class Boid {
         let sumVy = 0;
         let numBoids = 0;
         
-        for (const otherBoid of nearBoids) {
+        for (const [otherBoid, distanceSq] of nearBoids) {
             // Boids will only cohere and align with members of the same cohort
             if (this.boidPopulationProperties.continuousCohorts) {
                 const baseWeight = Math.min(
@@ -198,15 +204,18 @@ class Boid {
             }
 
             // avoid each other
-            // strength of avoidance is inversely proportional to distance
-            // (*not* inversely proportional to the square of the distance!  dividing out by the non-squared distance 
-            // gives you a unit-direction vector, so the magnitude would be invariant to the distance.)
-            const distanceSq = Math.max(1, boidDistanceSq(this, otherBoid));
             const diffX = this.x - otherBoid.x;
             const diffY = this.y - otherBoid.y;
 
-            this.deltaVx += diffX / distanceSq * this.boidProperties.separation;
-            this.deltaVy += diffY / distanceSq * this.boidProperties.separation;
+            // Note that dividing by the distance once gives you a unit vector in the direction of diff.
+            // Divide by the square of distance to get a vector with magnitude inversely proportional,
+            // and by the cube to get an inverse square relationship.
+            const distanceFactor = this.boidProperties.inverseSquareAvoidance ?
+                distanceSq * Math.sqrt(distanceSq) :
+                distanceSq;
+
+            this.deltaVx += diffX / distanceFactor * this.boidProperties.separation;
+            this.deltaVy += diffY / distanceFactor * this.boidProperties.separation;
         }
 
         if (numBoids > 0) {
@@ -222,8 +231,8 @@ class Boid {
             const averageVx = sumVx / numBoids;
             const averageVy = sumVy / numBoids;
 
-            this.deltaVx += (averageVx - this.deltaVx) * this.boidProperties.alignment;
-            this.deltaVy += (averageVy - this.deltaVy) * this.boidProperties.alignment;
+            this.deltaVx += (averageVx - this.vx) * this.boidProperties.alignment;
+            this.deltaVy += (averageVy - this.vy) * this.boidProperties.alignment;
         }
 
         // avoid the mouse
@@ -233,12 +242,16 @@ class Boid {
             const diffY = this.y - mousePosition.y;
             const distanceSq = Math.max(1, square(diffX) + square(diffY));
 
-            this.deltaVx += diffX / distanceSq * this.boidProperties.mouseAvoidance;
-            this.deltaVy += diffY / distanceSq * this.boidProperties.mouseAvoidance;
-
+            const distanceFactor = this.boidProperties.inverseSquareAvoidance ?
+                distanceSq * Math.sqrt(distanceSq) :
+                distanceSq;
+            this.deltaVx += diffX / distanceFactor * this.boidProperties.mouseAvoidance;
+            this.deltaVy += diffY / distanceFactor * this.boidProperties.mouseAvoidance;
         }
 
         // cap acceleration
+        // We only need the sqrt when the cap is active. 
+        // todo: fix
         const deltaVMagnitude = Math.sqrt(square(this.deltaVx) + square(this.deltaVy));
         if (deltaVMagnitude > this.boidProperties.maxAcceleration) {
             this.deltaVx *= this.boidProperties.maxAcceleration / deltaVMagnitude;
@@ -423,24 +436,25 @@ class World {
         }
     }   
     
-    getNearBoidsQuadratic(boid: Boid): Boid[] {
-        let nearBoids: Boid[] = [];
+    getNearBoidsQuadratic(boid: Boid): [boid: Boid, distanceSq: number][] {
+        let nearBoids: [Boid, number][] = [];
 
         for (let otherBoid of this.boids) {
             if (otherBoid === boid) {
                 continue;
             }
 
-            if (boidDistanceSq(boid, otherBoid) < square(this.boidProperties.awarenessRadius)) {
-                nearBoids.push(otherBoid);
+            const distanceSq = boidDistanceSq(boid, otherBoid);
+            if (distanceSq< square(this.boidProperties.awarenessRadius)) {
+                nearBoids.push([otherBoid, distanceSq]);
             }
         }
 
         return nearBoids;
     }
 
-    getNearBoids(boid: Boid): Boid[] {   
-        let nearBoids: Boid[] = [];
+    getNearBoids(boid: Boid): [boid: Boid, distanceSq: number][] {   
+        let nearBoids: [boid: Boid, distancesq: number][] = [];
         const awarenessRadius = this.boidProperties.awarenessRadius;
         const sqAwarenessRadius = square(awarenessRadius);
 
@@ -456,8 +470,9 @@ class World {
                         continue;
                     }
 
-                    if (boidDistanceSq(boid, otherBoid) < sqAwarenessRadius) {
-                        nearBoids.push(otherBoid);
+                    const distanceSq = boidDistanceSq(boid, otherBoid);
+                    if (distanceSq < sqAwarenessRadius) {
+                        nearBoids.push([otherBoid, distanceSq]);
                     }
                 }
             }
