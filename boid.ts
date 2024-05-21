@@ -4,13 +4,10 @@
 //  * https://vanhunteradams.com/Pico/Animal_Movement/Boids-algorithm.html
 //
 // todo: 
-//  * finish moving numBoids to boidPopulationProperties
-//  * make boidPopulationProperties editable at runtime
 //  * build a general mechanism for modifying world properties at runtime
-//    * extract cohort setting to separate function
-//    * write a general re-cohort method
 //    * move screen res stuff to separate properties struct
-//    * support for custom functions on mutation (e.g. changing number of boids, cohort properties)
+//    * allow for per-field data validation and conversion (e.g. float vs int, positive values, etc)
+//    * fix default state of checkboxes
 //  * 3d!
 //  * autosize canvas to visible space
 //  * I bet draw can be made leaner.  experiment with pre-rendering ~100 boids at different rotations and use canvas.drawImage
