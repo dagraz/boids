@@ -12,6 +12,7 @@
 //  * autosize canvas to visible space
 //  * I bet draw can be made leaner.  experiment with pre-rendering ~100 boids at different rotations and use canvas.drawImage
 //  * better understand heap usage.  there is a *lot* of churn in there, it should be possible for there to be almost none.
+//  * inverse-distance is very strong.  Try inverse-squares for boid+edge avoidance
 
 
 interface IndexableProperties {
@@ -530,6 +531,7 @@ function extendControlPanel<Properties extends IndexableProperties>(
             input.setAttribute('type', 'number');
         } else if (typeof properties[key] === "boolean") {
             input.setAttribute('type', 'checkbox');
+            input.toggleAttribute('checked', properties[key] as boolean);
         }
         
         const label = document.createElement('label');
