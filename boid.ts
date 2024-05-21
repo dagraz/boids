@@ -4,6 +4,8 @@
 //  * https://vanhunteradams.com/Pico/Animal_Movement/Boids-algorithm.html
 //
 // todo: 
+//  * finish moving numBoids to boidPopulationProperties
+//  * make boidPopulationProperties editable at runtime
 //  * build a general mechanism for modifying world properties at runtime
 //    * extract cohort setting to separate function
 //    * write a general re-cohort method
@@ -15,24 +17,31 @@
 //  * better understand heap usage.  there is a *lot* of churn in there, it should be possible for there to be almost none.
 
 
+interface IndexableProperties {
+    [index:string]: number | boolean | string;
+}
+
 interface CohortProperties {
     color: string;
     cohort: number;
+    cohortSeed: number;
 }
 
-interface CohortSetup {
+interface BoidPopulationProperties extends IndexableProperties {
+    numBoids: number;
     continuousCohorts: boolean;
     homogenousCohorts: boolean;
-    colors: string[];
+    colors: string;
 }
 
-const DEFAULT_COHORT_SETUP: CohortSetup = {
+const BOID_POPULATION_PROPERTIES_DEFAULT: BoidPopulationProperties = {
+    numBoids: 1000,
     continuousCohorts: false,
     homogenousCohorts: true,
-    colors: ["red", "blue",],
+    colors: "red, blue",
 }
 
-interface BoidProperties {
+interface BoidProperties extends IndexableProperties {
     width: number;
     height: number;
     circularBorder: boolean;
@@ -55,8 +64,6 @@ interface BoidProperties {
     mouseAvoidance: number;
 
     edgeAvoidance: number;
-
-    [index:string]: number | boolean;
 };
 
 const BOID_PROPERTIES_DEFAULT: BoidProperties = {
@@ -89,15 +96,15 @@ function boidDistance(boidA: Boid, boidB: Boid): number {
 
 class Boid {
     constructor(public x: number, public y: number, speed: number, public direction: number, 
-        boidProperties: BoidProperties, cohortProperties: CohortSetup, properties: CohortProperties) {
+        boidProperties: BoidProperties, boidPopulationProperties: BoidPopulationProperties, cohortProperties: CohortProperties) {
         
         this.vx = speed * Math.cos(direction);
         this.vy = speed * Math.sin(direction);
         this.deltaVx = 0;
         this.deltaVy = 0;
 
-        this.cohortProperties = properties;
-        this.cohortSetup = cohortProperties;
+        this.cohortProperties = cohortProperties;
+        this.boidPopulationProperties = boidPopulationProperties;
         this.boidProperties = boidProperties;
     }
 
@@ -107,7 +114,7 @@ class Boid {
     deltaVy: number;
 
     cohortProperties: CohortProperties;
-    cohortSetup: CohortSetup;
+    boidPopulationProperties: BoidPopulationProperties;
     boidProperties: BoidProperties;
 
     public draw(context: CanvasRenderingContext2D) {
@@ -171,11 +178,11 @@ class Boid {
         
         for (const otherBoid of nearBoids) {
             // Boids will only cohere and align with members of the same cohort
-            if (this.cohortSetup.continuousCohorts) {
+            if (this.boidPopulationProperties.continuousCohorts) {
                 const baseWeight = Math.min(
                     Math.abs(otherBoid.cohortProperties.cohort - this.cohortProperties.cohort),
                     360 - Math.abs(otherBoid.cohortProperties.cohort - this.cohortProperties.cohort)) / 180;
-                const weight = this.cohortSetup.homogenousCohorts ?
+                const weight = this.boidPopulationProperties.homogenousCohorts ?
                     1 - baseWeight :
                     baseWeight;
                 
@@ -271,12 +278,9 @@ class World {
     public context: CanvasRenderingContext2D;
     public boids: Boid[];
 
-    //boidProperties: BoidProperties;
-    boidProperties: {
-        [Property in keyof BoidProperties]: BoidProperties[Property];
-    };
-
-    cohortProperties: CohortSetup;
+    boidProperties: BoidProperties;
+    boidPopulationProperties: BoidPopulationProperties;
+    colors: string[];
 
     mousePosition: {x: number, y: number} | null;
 
@@ -294,9 +298,9 @@ class World {
         return Math.floor(cleanY / this.bucketYSize);
     }
 
-    constructor(canvas: HTMLCanvasElement, numBoids: number, 
+    constructor(canvas: HTMLCanvasElement,
         public useSpaceBuckets: boolean, boidProperties: Partial<BoidProperties>, 
-        cp: Partial<CohortSetup>) {
+        bpp: Partial<BoidPopulationProperties>) {
 
         this.canvas = canvas;
         this.context = canvas.getContext("2d", {alpha: false}) as CanvasRenderingContext2D;
@@ -305,7 +309,16 @@ class World {
             height: canvas.height,
             ...boidProperties
         };
-        this.cohortProperties = {...DEFAULT_COHORT_SETUP, ...cp};
+
+        // Bug in tsc?  without the second term explicitly assigning numBoids, tsc throws a type error.
+        //    Type 'string | number | boolean | undefined' is not assignable to type 'string | number | boolean'.
+        //    Type 'undefined' is not assignable to type 'string | number | boolean'.ts(2322)
+        // weirdly, this compiles fine in 4.5.4.  Poking around online finds complaints of this error in similar contexts in the 2.x series.  
+        // possible regression?
+        this.boidPopulationProperties = {...BOID_POPULATION_PROPERTIES_DEFAULT, numBoids: BOID_POPULATION_PROPERTIES_DEFAULT.numBoids, ...bpp};
+
+        this.colors = [];
+
         this.mousePosition = null;
 
         this.bucketXSize = 50;
@@ -331,26 +344,19 @@ class World {
 
         this.boids = []
 
-        this.updateNumBoids(numBoids);
+        this.updateNumBoids();
     }
 
-    updateNumBoids(numBoids: number) {
-        while (this.boids.length < numBoids) {
-            let boidProperties: CohortProperties = {cohort: 0, color: "red"};
-            if (this.cohortProperties.continuousCohorts) {
-                boidProperties.cohort = 360 * Math.random();
-                //boidProperties.color = `hsl(${boidProperties.cohort} 100% 50%)`;
-                boidProperties.color = `hsl(${boidProperties.cohort} 80% 60%)`;
-            } else {
-                const cohort = Math.floor(this.cohortProperties.colors.length * Math.random());
-                boidProperties.cohort = cohort;
-                boidProperties.color = this.cohortProperties.colors[cohort];
-            }
+    updateNumBoids() {
+        while (this.boids.length < this.boidPopulationProperties.numBoids) {
+            const cohortSeed = Math.random();
+            // more detailed cohort information is determined in updateCohorts, called below
+            let cohortProperties: CohortProperties = {cohort: 0, color: "green", cohortSeed: cohortSeed};
 
             const boid = new Boid(
                 (Math.random() * 0.8 + 0.1) * this.boidProperties.width,
                 (Math.random() * 0.8 + 0.1) * this.boidProperties.height,
-                1, Math.random() * 2 * Math.PI, this.boidProperties, this.cohortProperties, boidProperties);
+                1, Math.random() * 2 * Math.PI, this.boidProperties, this.boidPopulationProperties, cohortProperties);
 
             this.boids.push(boid);
 
@@ -361,8 +367,27 @@ class World {
             }
         }
 
-        if (this.boids.length > numBoids) {
-            this.boids.length = numBoids;
+        if (this.boids.length > this.boidPopulationProperties.numBoids) {
+            this.boids.length = this.boidPopulationProperties.numBoids;
+        }
+
+        this.updateCohorts();
+    }
+
+    updateCohorts() {
+        // todo: we need safety checking and reasonable fallback for bad values
+        this.colors = this.boidPopulationProperties.colors.split(',');
+
+        for (const boid of this.boids) {
+            const cohortProperties = boid.cohortProperties;
+            if (this.boidPopulationProperties.continuousCohorts) {
+                cohortProperties.cohort = 360 * cohortProperties.cohortSeed;
+                cohortProperties.color = `hsl(${cohortProperties.cohort} 80% 60%)`;
+            } else {
+                const cohort = Math.floor(this.colors.length * cohortProperties.cohortSeed);
+                cohortProperties.cohort = cohort;
+                cohortProperties.color = this.colors[cohort];
+            }
         }
     }
 
@@ -458,8 +483,8 @@ let canvas = document.getElementsByTagName("canvas")[0];
 canvas.width = 1000;
 canvas.height = 800;    
 
-const world = new World(canvas, 2000, true, 
-    {circularBorder: false, }, {continuousCohorts: false, homogenousCohorts: true, });
+const world = new World(canvas, true, 
+    {circularBorder: false, }, {numBoids: 2000, continuousCohorts: false, homogenousCohorts: true, });
 
 canvas.addEventListener("mousemove", (e) => {
     if (world.mousePosition === null) {
@@ -494,42 +519,59 @@ function cycle() {
     raf = window.requestAnimationFrame(cycle)
 }
 
+
+function extendControlPanel<Properties extends IndexableProperties>(
+    properties: Properties, defaultProperties: Properties, controlPanel: HTMLDivElement,
+    update?: () => void) {
+    for (const [kkey, value] of Object.entries(properties)) {
+        const key = kkey as keyof Properties;
+        const input = document.createElement('input') as HTMLInputElement;
+        input.setAttribute('name', key as string);
+        input.setAttribute('value', value.toString());
+
+        if (typeof properties[key] === "number") {
+            input.setAttribute('type', 'number');
+        } else if (typeof properties[key] === "boolean") {
+            input.setAttribute('type', 'checkbox');
+        }
+        
+        const label = document.createElement('label');
+        label.innerHTML = key as string;
+        label.appendChild(input);
+        
+        controlPanel.appendChild(label);
+        
+        input.addEventListener("change", () => {
+            if (typeof properties[key] === "number") {
+                const value = parseFloat(input.value);
+                properties[key] = (isNaN(value) ?
+                    defaultProperties[key] : value) as Properties[typeof key];
+            } else if (typeof properties[key] === "boolean") {
+                properties[key] = input.checked as Properties[typeof key];
+            } else if (typeof properties[key] === "string") {
+                properties[key] = input.value as Properties[typeof key];
+            }
+
+            if (update !== undefined) {
+                update();
+            }
+        });
+    }
+}
+
+/*
 const numBoidsInput = document.querySelector("[name=numBoids]") as HTMLInputElement;
 numBoidsInput.value = world.boids.length.toString();
 numBoidsInput.addEventListener("change", (evt) => {
-    world.updateNumBoids(parseInt(numBoidsInput.value));
+    world.boidPopulationProperties.numBoids = parseInt(numBoidsInput.value);
+    world.updateNumBoids();
     return false;
 });
+*/
 
 const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
-
-for (const [key, value] of Object.entries(world.boidProperties)) {
-    const input = document.createElement('input') as HTMLInputElement;
-    input.setAttribute('name', key);
-    input.setAttribute('value', value.toString());
-
-    if (typeof world.boidProperties[key] === "number") {
-        input.setAttribute('type', 'number');
-    } else if (typeof world.boidProperties[key] === "boolean") {
-        input.setAttribute('type', 'checkbox');
-    }
-        
-    const label = document.createElement('label');
-    label.innerHTML = key;
-    label.appendChild(input);
-        
-    controlPanel.appendChild(label);
-        
-    input.addEventListener("change", () => {
-        // todo: check for NaN, negative numbers.  fall back to default
-        if (typeof world.boidProperties[key] === "number") {
-            const value = parseFloat(input.value);
-            world.boidProperties[key] = isNaN(value) ?
-                BOID_PROPERTIES_DEFAULT[key] : value;
-        } else if (typeof world.boidProperties[key] === "boolean") {
-            world.boidProperties[key] = input.checked;
-        }
-    });
-}
+extendControlPanel(world.boidPopulationProperties, BOID_POPULATION_PROPERTIES_DEFAULT, controlPanel, 
+    () => {world.updateNumBoids()});
+extendControlPanel(world.boidProperties, BOID_PROPERTIES_DEFAULT, controlPanel);
 
 cycle();
