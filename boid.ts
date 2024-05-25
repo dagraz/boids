@@ -14,8 +14,6 @@
 //  * optimization
 //    * I bet draw can be made leaner.  experiment with pre-rendering ~100 boids at different rotations and use canvas.drawImage
 //    * better understand heap usage.  there is a *lot* of churn in there, it should be possible for there to be almost none.
-//    * cache / memoize distance calculations
-//    * near-boids are probably very stable from one cycle to the next.  add an option to update on every-other cycle.
 //    * try moving from boid pointers to indices
 //
 // When using inverseSquare avoidance, drop cohesion by an order of magnitude and double seperation.
