@@ -11,7 +11,9 @@
 //  * autosize canvas to visible space
 //  * I bet draw can be made leaner.  experiment with pre-rendering ~100 boids at different rotations and use canvas.drawImage
 //  * better understand heap usage.  there is a *lot* of churn in there, it should be possible for there to be almost none.
-//  * inverse-distance is very strong.  Try inverse-squares for boid+edge avoidance
+//  * make bucket size runtime tunable
+//  * cache / memoize distance calculations
+//  * near-boids are probably very stable from one cycle to the next.  add an option to update on every-other cycle.
 //
 // When using inverseSquare avoidance, drop cohesion by an order of magnitude and double seperation.
 
@@ -37,6 +39,16 @@ const BOID_POPULATION_PROPERTIES_DEFAULT: BoidPopulationProperties = {
     continuousCohorts: false,
     homogenousCohorts: true,
     colors: "red, blue",
+}
+
+interface SpaceBucketProperties extends IndexableProperties {
+    bucketXSize: number;
+    bucketYSize: number;
+}
+
+const SPACE_BUCKET_PROPERTIES_DEFAULT: SpaceBucketProperties = {
+    bucketXSize: 50,
+    bucketYSize: 50,
 }
 
 interface BoidProperties extends IndexableProperties {
@@ -79,7 +91,7 @@ const BOID_PROPERTIES_DEFAULT: BoidProperties = {
     alignment: 0.025,
     mouseAvoidance: 5,
     edgeAvoidance: 5,
-    inverseSquareAvoidance: false
+    inverseSquareAvoidance: false,
 };
 
 function square(x: number): number {
@@ -291,22 +303,21 @@ class World {
 
     boidProperties: BoidProperties;
     boidPopulationProperties: BoidPopulationProperties;
+    spaceBucketProperties: SpaceBucketProperties;
     colors: string[];
 
     mousePosition: {x: number, y: number} | null;
 
     spaceBuckets: Boid[][][];
-    bucketXSize: number;
-    bucketYSize: number;
 
     xToBucket(x: number): number {
         const cleanX = Math.min(this.boidProperties.width, Math.max(0, x));
-        return Math.floor(cleanX / this.bucketXSize);
+        return Math.floor(cleanX / this.spaceBucketProperties.bucketXSize);
     }
 
     yToBucket(y: number): number {
         const cleanY = Math.min(this.boidProperties.height, Math.max(0, y));
-        return Math.floor(cleanY / this.bucketYSize);
+        return Math.floor(cleanY / this.spaceBucketProperties.bucketYSize);
     }
 
     constructor(canvas: HTMLCanvasElement,
@@ -321,6 +332,8 @@ class World {
             ...boidProperties
         };
 
+        this.spaceBucketProperties = SPACE_BUCKET_PROPERTIES_DEFAULT;
+
         // Bug in tsc?  without the second term explicitly assigning numBoids, tsc throws a type error.
         //    Type 'string | number | boolean | undefined' is not assignable to type 'string | number | boolean'.
         //    Type 'undefined' is not assignable to type 'string | number | boolean'.ts(2322)
@@ -332,14 +345,18 @@ class World {
 
         this.mousePosition = null;
 
-        this.bucketXSize = 50;
-        this.bucketYSize = 50;
-
         this.spaceBuckets = [];
+        this.resetSpaceBuckets();
 
-        if (useSpaceBuckets) {
-            const numXBuckets = Math.floor(canvas.width / this.bucketXSize) + 1;
-            const numYBuckets = Math.floor(canvas.height / this.bucketYSize) + 1;
+        this.boids = []
+
+        this.updateNumBoids();
+    }
+
+    resetSpaceBuckets() {
+        if (this.useSpaceBuckets) {
+            const numXBuckets = Math.floor(canvas.width / this.spaceBucketProperties.bucketXSize) + 1;
+            const numYBuckets = Math.floor(canvas.height / this.spaceBucketProperties.bucketYSize) + 1;
         
             this.spaceBuckets.length = numXBuckets;
 
@@ -352,10 +369,14 @@ class World {
                 }
             }
         }
+    }
 
-        this.boids = []
-
-        this.updateNumBoids();
+    clearSpaceBuckets() {
+        for(let row of this.spaceBuckets) {
+            for(let col of row) {
+                col.length = 0;
+            }
+        }
     }
 
     updateNumBoids() {
@@ -411,31 +432,23 @@ class World {
         }
     }
 
-    clearSpaceBuckets() {
-        for(let row of this.spaceBuckets) {
-            for(let col of row) {
-                col.length = 0;
-            }
-        }
-    }
-
     moveBoids() {
-        if (this.useSpaceBuckets) {
-            this.clearSpaceBuckets();
-        }
-
         for (let boid of this.boids) {
             boid.updatePosition();
             boid.updateVelocity();
-
-            if (this.useSpaceBuckets) {
-                const xBucket = this.xToBucket(boid.x);
-                const yBucket = this.yToBucket(boid.y);
-                this.spaceBuckets[xBucket][yBucket].push(boid);
-            }
         }
     }   
     
+    assignSpaceBuckets() {
+        this.clearSpaceBuckets();
+
+        for (let boid of this.boids) {
+            const xBucket = this.xToBucket(boid.x);
+            const yBucket = this.yToBucket(boid.y);
+            this.spaceBuckets[xBucket][yBucket].push(boid);
+        }
+    }
+
     getNearBoidsQuadratic(boid: Boid): [boid: Boid, distanceSq: number][] {
         let nearBoids: [Boid, number][] = [];
 
@@ -482,12 +495,17 @@ class World {
     }
 
     updateBoids() {
-        for (let boid of this.boids) {
-            const nearBoids = this.useSpaceBuckets ?
-                this.getNearBoids(boid) :
-                this.getNearBoidsQuadratic(boid);
-
-            boid.updateAcceleration(nearBoids, this.mousePosition);
+        if (this.useSpaceBuckets) {
+            this.assignSpaceBuckets();
+            for (let boid of this.boids) {
+                const nearBoids = this.getNearBoids(boid);
+                boid.updateAcceleration(nearBoids, this.mousePosition);
+            }
+        } else {
+            for (let boid of this.boids) {
+                const nearBoids = this.getNearBoidsQuadratic(boid);
+                boid.updateAcceleration(nearBoids, this.mousePosition);
+            }
         }
     }
 }
@@ -573,19 +591,11 @@ function extendControlPanel<Properties extends IndexableProperties>(
     }
 }
 
-/*
-const numBoidsInput = document.querySelector("[name=numBoids]") as HTMLInputElement;
-numBoidsInput.value = world.boids.length.toString();
-numBoidsInput.addEventListener("change", (evt) => {
-    world.boidPopulationProperties.numBoids = parseInt(numBoidsInput.value);
-    world.updateNumBoids();
-    return false;
-});
-*/
-
 const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
 extendControlPanel(world.boidPopulationProperties, BOID_POPULATION_PROPERTIES_DEFAULT, controlPanel, 
     () => {world.updateNumBoids()});
+extendControlPanel(world.spaceBucketProperties, SPACE_BUCKET_PROPERTIES_DEFAULT, controlPanel, 
+    () => {world.resetSpaceBuckets()});
 extendControlPanel(world.boidProperties, BOID_PROPERTIES_DEFAULT, controlPanel);
 
 cycle();
