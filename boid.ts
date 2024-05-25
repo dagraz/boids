@@ -4,16 +4,18 @@
 //  * https://vanhunteradams.com/Pico/Animal_Movement/Boids-algorithm.html
 //
 // todo: 
-//  * build a general mechanism for modifying world properties at runtime
-//    * move screen res stuff to separate properties struct
+//  * screen res
+//    * provide option to match visible screen
+//    * move screen res to a separate struct and make sure it DoesTheRightThing
+//  * runtime property changes
 //    * allow for per-field data validation and conversion (e.g. float vs int, positive values, etc)
+//    * more elegant per-field callback specification instead of per-interface
 //  * 3d!
-//  * autosize canvas to visible space
-//  * I bet draw can be made leaner.  experiment with pre-rendering ~100 boids at different rotations and use canvas.drawImage
-//  * better understand heap usage.  there is a *lot* of churn in there, it should be possible for there to be almost none.
-//  * make bucket size runtime tunable
-//  * cache / memoize distance calculations
-//  * near-boids are probably very stable from one cycle to the next.  add an option to update on every-other cycle.
+//  * optimization
+//    * I bet draw can be made leaner.  experiment with pre-rendering ~100 boids at different rotations and use canvas.drawImage
+//    * better understand heap usage.  there is a *lot* of churn in there, it should be possible for there to be almost none.
+//    * cache / memoize distance calculations
+//    * near-boids are probably very stable from one cycle to the next.  add an option to update on every-other cycle.
 //
 // When using inverseSquare avoidance, drop cohesion by an order of magnitude and double seperation.
 
