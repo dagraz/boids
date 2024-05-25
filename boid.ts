@@ -321,7 +321,7 @@ class World {
     }
 
     constructor(canvas: HTMLCanvasElement,
-        public useSpaceBuckets: boolean, boidProperties: Partial<BoidProperties>, 
+        boidProperties: Partial<BoidProperties>, 
         bpp: Partial<BoidPopulationProperties>) {
 
         this.canvas = canvas;
@@ -354,23 +354,21 @@ class World {
     }
 
     resetSpaceBuckets() {
-        if (this.useSpaceBuckets) {
-            const numXBuckets = Math.floor(canvas.width / this.spaceBucketProperties.bucketSize) + 1;
-            const numYBuckets = Math.floor(canvas.height / this.spaceBucketProperties.bucketSize) + 1;
+        const numXBuckets = Math.floor(canvas.width / this.spaceBucketProperties.bucketSize) + 1;
+        const numYBuckets = Math.floor(canvas.height / this.spaceBucketProperties.bucketSize) + 1;
         
-            this.spaceBuckets.length = numXBuckets;
+        this.spaceBuckets.length = numXBuckets;
 
-            for (let x = 0; x < numXBuckets; ++x) {
-                this.spaceBuckets[x] = []
-                this.spaceBuckets[x].length = numYBuckets;
+        for (let x = 0; x < numXBuckets; ++x) {
+            this.spaceBuckets[x] = []
+            this.spaceBuckets[x].length = numYBuckets;
             
-                for (let y = 0; y < numYBuckets; ++y) {
-                    this.spaceBuckets[x][y] = [];
-                }
+            for (let y = 0; y < numYBuckets; ++y) {
+                this.spaceBuckets[x][y] = [];
             }
         }
     }
-
+    
     clearSpaceBuckets() {
         for(let row of this.spaceBuckets) {
             for(let col of row) {
@@ -392,11 +390,9 @@ class World {
 
             this.boids.push(boid);
 
-            if (this.useSpaceBuckets) {
-                const xBucket = this.xToBucket(boid.x);
-                const yBucket = this.yToBucket(boid.y);
-                this.spaceBuckets[xBucket][yBucket].push(boid);
-            }
+            const xBucket = this.xToBucket(boid.x);
+            const yBucket = this.yToBucket(boid.y);
+            this.spaceBuckets[xBucket][yBucket].push(boid);
         }
 
         if (this.boids.length > this.boidPopulationProperties.numBoids) {
@@ -449,23 +445,6 @@ class World {
         }
     }
 
-    getNearBoidsQuadratic(boid: Boid): [boid: Boid, distanceSq: number][] {
-        let nearBoids: [Boid, number][] = [];
-
-        for (let otherBoid of this.boids) {
-            if (otherBoid === boid) {
-                continue;
-            }
-
-            const distanceSq = boidDistanceSq(boid, otherBoid);
-            if (distanceSq< square(this.boidProperties.awarenessRadius)) {
-                nearBoids.push([otherBoid, distanceSq]);
-            }
-        }
-
-        return nearBoids;
-    }
-
     getNearBoids(boid: Boid): [boid: Boid, distanceSq: number][] {   
         let nearBoids: [boid: Boid, distancesq: number][] = [];
         const awarenessRadius = this.boidProperties.awarenessRadius;
@@ -495,17 +474,10 @@ class World {
     }
 
     updateBoids() {
-        if (this.useSpaceBuckets) {
-            this.assignSpaceBuckets();
-            for (let boid of this.boids) {
-                const nearBoids = this.getNearBoids(boid);
-                boid.updateAcceleration(nearBoids, this.mousePosition);
-            }
-        } else {
-            for (let boid of this.boids) {
-                const nearBoids = this.getNearBoidsQuadratic(boid);
-                boid.updateAcceleration(nearBoids, this.mousePosition);
-            }
+        this.assignSpaceBuckets();
+        for (let boid of this.boids) {
+            const nearBoids = this.getNearBoids(boid);
+            boid.updateAcceleration(nearBoids, this.mousePosition);
         }
     }
 }
@@ -514,7 +486,7 @@ let canvas = document.getElementsByTagName("canvas")[0];
 canvas.width = 1000;
 canvas.height = 800;    
 
-const world = new World(canvas, true, 
+const world = new World(canvas,
     {circularBorder: false, }, {numBoids: 2000, continuousCohorts: false, homogenousCohorts: true, });
 
 canvas.addEventListener("mousemove", (e) => {
