@@ -16,9 +16,11 @@
 //    * better understand heap usage.  there is a *lot* of churn in there, it should be possible for there to be almost none.
 //    * cache / memoize distance calculations
 //    * near-boids are probably very stable from one cycle to the next.  add an option to update on every-other cycle.
+//    * try moving from boid pointers to indices
 //
 // When using inverseSquare avoidance, drop cohesion by an order of magnitude and double seperation.
 
+// used for runtime property changes
 interface IndexableProperties {
     [index:string]: number | boolean | string;
 }
@@ -44,13 +46,11 @@ const BOID_POPULATION_PROPERTIES_DEFAULT: BoidPopulationProperties = {
 }
 
 interface SpaceBucketProperties extends IndexableProperties {
-    bucketXSize: number;
-    bucketYSize: number;
+    bucketSize: number;
 }
 
 const SPACE_BUCKET_PROPERTIES_DEFAULT: SpaceBucketProperties = {
-    bucketXSize: 50,
-    bucketYSize: 50,
+    bucketSize: 50,
 }
 
 interface BoidProperties extends IndexableProperties {
@@ -314,12 +314,12 @@ class World {
 
     xToBucket(x: number): number {
         const cleanX = Math.min(this.boidProperties.width, Math.max(0, x));
-        return Math.floor(cleanX / this.spaceBucketProperties.bucketXSize);
+        return Math.floor(cleanX / this.spaceBucketProperties.bucketSize);
     }
 
     yToBucket(y: number): number {
         const cleanY = Math.min(this.boidProperties.height, Math.max(0, y));
-        return Math.floor(cleanY / this.spaceBucketProperties.bucketYSize);
+        return Math.floor(cleanY / this.spaceBucketProperties.bucketSize);
     }
 
     constructor(canvas: HTMLCanvasElement,
@@ -357,8 +357,8 @@ class World {
 
     resetSpaceBuckets() {
         if (this.useSpaceBuckets) {
-            const numXBuckets = Math.floor(canvas.width / this.spaceBucketProperties.bucketXSize) + 1;
-            const numYBuckets = Math.floor(canvas.height / this.spaceBucketProperties.bucketYSize) + 1;
+            const numXBuckets = Math.floor(canvas.width / this.spaceBucketProperties.bucketSize) + 1;
+            const numYBuckets = Math.floor(canvas.height / this.spaceBucketProperties.bucketSize) + 1;
         
             this.spaceBuckets.length = numXBuckets;
 
