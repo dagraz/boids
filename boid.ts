@@ -69,6 +69,7 @@ interface BoidProperties extends IndexableProperties {
     separation: number;
     cohesion: number;
     alignment: number;
+    linearDrag: number;
 
     // Flee or chase the mouse pointer.  
     mouseAvoidance: number;
@@ -89,6 +90,7 @@ const BOID_PROPERTIES_DEFAULT: BoidProperties = {
     separation: 1,
     cohesion: 0.005,
     alignment: 0.025,
+    linearDrag: 0,
     mouseAvoidance: 5,
     edgeAvoidance: 5,
     inverseSquareAvoidance: false,
@@ -279,13 +281,18 @@ class Boid {
         this.vx += this.deltaVx;
         this.vy += this.deltaVy;
         
-        const vMagnitude = Math.sqrt(square(this.vx) + square(this.vy));
-        if (vMagnitude > this.boidProperties.maxSpeed) {
-            this.vx *= this.boidProperties.maxSpeed / vMagnitude;
-            this.vy *= this.boidProperties.maxSpeed / vMagnitude;
-        } else if (vMagnitude < this.boidProperties.minSpeed && vMagnitude > 0) {
-            this.vx *= this.boidProperties.minSpeed / vMagnitude;
-            this.vy *= this.boidProperties.minSpeed / vMagnitude;
+        // minor optimization opportunity:
+        // pre-cache min/max speed squared and use that.  calc the sqrt only if needed
+        const speed = Math.sqrt(square(this.vx) + square(this.vy));
+        if (speed < this.boidProperties.minSpeed && speed > 0) {
+            this.vx *= this.boidProperties.minSpeed / speed;
+            this.vy *= this.boidProperties.minSpeed / speed;
+        } else if (this.boidProperties.linearDrag > 0) {
+            this.vx *= this.boidProperties.linearDrag;
+            this.vy *= this.boidProperties.linearDrag;
+        } else if (speed > this.boidProperties.maxSpeed) {
+            this.vx *= this.boidProperties.maxSpeed / speed;
+            this.vy *= this.boidProperties.maxSpeed / speed;
         } // just going to ignore the === 0 case for now
                 
         this.direction = Math.atan2(this.vy, this.vx);
