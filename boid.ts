@@ -130,23 +130,20 @@ class Boid {
     boidProperties: BoidProperties;
 
     public draw(context: CanvasRenderingContext2D) {
-        // turns out save/restore/rotate are a little pricey for how lightly this uses them.
+        // turns out save/restore/rotate/translate are a little pricey for how lightly this uses them.
         // doing the equiv work by hand shaves off a non-trivial hunk of cpu time.
-        context.translate(Math.floor(this.x), Math.floor(this.y));
 
         const cos = Math.cos(this.direction);
         const sin = Math.sin(this.direction);
 
         context.beginPath();
-        context.moveTo(Math.floor(7 * cos), Math.floor(7 * sin));
-        context.lineTo(Math.floor(-3 * sin), Math.floor(3 * cos));
-        context.lineTo(Math.floor(3 * sin), Math.floor(-3 * cos));
+        context.moveTo(Math.floor(this.x + 7 * cos), Math.floor(this.y + 7 * sin));
+        context.lineTo(Math.floor(this.x + -3 * sin), Math.floor(this.y + 3 * cos));
+        context.lineTo(Math.floor(this.x + 3 * sin), Math.floor(this.y + -3 * cos));
         context.closePath();
 
         context.fillStyle = this.cohortProperties.color;
         context.fill();
-
-        context.translate(-Math.floor(this.x), -Math.floor(this.y));
     }
 
 
