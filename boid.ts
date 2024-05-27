@@ -162,9 +162,6 @@ class Boid {
     }
 
     updateAcceleration(nearBoids: [boid: Boid, distanceSq: number][], mousePosition: {x: number, y: number} | null) {
-        this.deltaVx = 0;
-        this.deltaVy = 0;
-
         // avoid edges
         if (this.boidProperties.circularBorder) {
             const centerWidth = 0.5 * this.boidProperties.width;
@@ -280,7 +277,9 @@ class Boid {
         // update and cap velocity
         this.vx += this.deltaVx;
         this.vy += this.deltaVy;
-        
+        this.deltaVx = 0;
+        this.deltaVy = 0;
+
         // minor optimization opportunity:
         // pre-cache min/max speed squared and use that.  calc the sqrt only if needed
         const speed = Math.sqrt(square(this.vx) + square(this.vy));
@@ -288,8 +287,9 @@ class Boid {
             this.vx *= this.boidProperties.minSpeed / speed;
             this.vy *= this.boidProperties.minSpeed / speed;
         } else if (this.boidProperties.linearDrag > 0) {
-            this.vx *= this.boidProperties.linearDrag;
-            this.vy *= this.boidProperties.linearDrag;
+            // while we're here and already have the speed calculated
+            this.deltaVx = - this.vx * this.boidProperties.linearDrag;
+            this.deltaVy = - this.vy * this.boidProperties.linearDrag;
         } else if (speed > this.boidProperties.maxSpeed) {
             this.vx *= this.boidProperties.maxSpeed / speed;
             this.vy *= this.boidProperties.maxSpeed / speed;
