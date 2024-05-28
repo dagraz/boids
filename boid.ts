@@ -85,7 +85,7 @@ const BOID_PROPERTIES_DEFAULT: BoidProperties = {
     height: 800,
     circularBorder: false,
 
-    minSpeed: 0.5,
+    minSpeed: 0.75,
     maxSpeed: 2,
     maxAcceleration: 0.2,
     awarenessRadius: 50,
