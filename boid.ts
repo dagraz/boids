@@ -38,7 +38,7 @@ interface WorldProperties extends IndexableProperties {
 }
 
 const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
-    numBoids: 1000,
+    numBoids: 500,
     continuousCohorts: false,
     homogenousCohorts: true,
     colors: "red, blue",
@@ -50,7 +50,7 @@ interface SpaceBucketProperties extends IndexableProperties {
 }
 
 const SPACE_BUCKET_PROPERTIES_DEFAULT: SpaceBucketProperties = {
-    bucketSize: 50,
+    bucketSize: 25,
 }
 
 interface BoidProperties extends IndexableProperties {
@@ -88,14 +88,14 @@ const BOID_PROPERTIES_DEFAULT: BoidProperties = {
     minSpeed: 0.5,
     maxSpeed: 2,
     maxAcceleration: 0.2,
-    awarenessRadius: 100,
-    separation: 1,
-    cohesion: 0.005,
+    awarenessRadius: 50,
+    separation: 10,
+    cohesion: 0.0025,
     alignment: 0.025,
-    linearDrag: 0,
+    linearDrag: 0.0025,
     mouseAvoidance: 5,
     edgeAvoidance: 5,
-    inverseSquareAvoidance: false,
+    inverseSquareAvoidance: true,
 };
 
 function square(x: number): number {
@@ -498,7 +498,7 @@ canvas.width = 1000;
 canvas.height = 800;    
 
 const world = new World(canvas,
-    {circularBorder: false, }, {numBoids: 2000, continuousCohorts: false, homogenousCohorts: true, });
+    {circularBorder: false, }, {numBoids: 500, continuousCohorts: false, homogenousCohorts: true, });
 
 canvas.addEventListener("mousemove", (e) => {
     if (world.mousePosition === null) {
