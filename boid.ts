@@ -29,18 +29,20 @@ interface CohortProperties {
     cohortSeed: number;
 }
 
-interface BoidPopulationProperties extends IndexableProperties {
+interface WorldProperties extends IndexableProperties {
     numBoids: number;
     continuousCohorts: boolean;
     homogenousCohorts: boolean;
     colors: string;
+    gravity: number;
 }
 
-const BOID_POPULATION_PROPERTIES_DEFAULT: BoidPopulationProperties = {
+const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
     numBoids: 1000,
     continuousCohorts: false,
     homogenousCohorts: true,
     colors: "red, blue",
+    gravity: 0,
 }
 
 interface SpaceBucketProperties extends IndexableProperties {
@@ -110,7 +112,7 @@ function boidDistance(boidA: Boid, boidB: Boid): number {
 
 class Boid {
     constructor(public x: number, public y: number, speed: number, public direction: number, 
-        boidProperties: BoidProperties, boidPopulationProperties: BoidPopulationProperties, cohortProperties: CohortProperties) {
+        boidProperties: BoidProperties, worldProperties: WorldProperties, cohortProperties: CohortProperties) {
         
         this.vx = speed * Math.cos(direction);
         this.vy = speed * Math.sin(direction);
@@ -118,7 +120,7 @@ class Boid {
         this.deltaVy = 0;
 
         this.cohortProperties = cohortProperties;
-        this.boidPopulationProperties = boidPopulationProperties;
+        this.worldProperties = worldProperties;
         this.boidProperties = boidProperties;
     }
 
@@ -128,7 +130,7 @@ class Boid {
     deltaVy: number;
 
     cohortProperties: CohortProperties;
-    boidPopulationProperties: BoidPopulationProperties;
+    worldProperties: WorldProperties;
     boidProperties: BoidProperties;
 
     public draw(context: CanvasRenderingContext2D) {
@@ -162,6 +164,11 @@ class Boid {
     }
 
     updateAcceleration(nearBoids: [boid: Boid, distanceSq: number][], mousePosition: {x: number, y: number} | null) {
+        // gravity
+        if (this.worldProperties.gravity > 0) {
+            this.deltaVy += this.worldProperties.gravity;
+        }
+
         // avoid edges
         if (this.boidProperties.circularBorder) {
             const centerWidth = 0.5 * this.boidProperties.width;
@@ -190,11 +197,11 @@ class Boid {
         
         for (const [otherBoid, distanceSq] of nearBoids) {
             // Boids will only cohere and align with members of the same cohort
-            if (this.boidPopulationProperties.continuousCohorts) {
+            if (this.worldProperties.continuousCohorts) {
                 const baseWeight = Math.min(
                     Math.abs(otherBoid.cohortProperties.cohort - this.cohortProperties.cohort),
                     360 - Math.abs(otherBoid.cohortProperties.cohort - this.cohortProperties.cohort)) / 180;
-                const weight = this.boidPopulationProperties.homogenousCohorts ?
+                const weight = this.worldProperties.homogenousCohorts ?
                     1 - baseWeight :
                     baseWeight;
                 
@@ -306,7 +313,7 @@ class World {
     public boids: Boid[];
 
     boidProperties: BoidProperties;
-    boidPopulationProperties: BoidPopulationProperties;
+    worldProperties: WorldProperties;
     spaceBucketProperties: SpaceBucketProperties;
     colors: string[];
 
@@ -326,7 +333,7 @@ class World {
 
     constructor(canvas: HTMLCanvasElement,
         boidProperties: Partial<BoidProperties>, 
-        bpp: Partial<BoidPopulationProperties>) {
+        bpp: Partial<WorldProperties>) {
 
         this.canvas = canvas;
         this.context = canvas.getContext("2d", {alpha: false}) as CanvasRenderingContext2D;
@@ -343,7 +350,7 @@ class World {
         //    Type 'undefined' is not assignable to type 'string | number | boolean'.ts(2322)
         // weirdly, this compiles fine in 4.5.4.  Poking around online finds complaints of this error in similar contexts in the 2.x series.  
         // possible regression?
-        this.boidPopulationProperties = {...BOID_POPULATION_PROPERTIES_DEFAULT, numBoids: BOID_POPULATION_PROPERTIES_DEFAULT.numBoids, ...bpp};
+        this.worldProperties = {...WORLD_PROPERTIES_DEFAULT, numBoids: WORLD_PROPERTIES_DEFAULT.numBoids, ...bpp};
 
         this.colors = [];
 
@@ -382,7 +389,7 @@ class World {
     }
 
     updateNumBoids() {
-        while (this.boids.length < this.boidPopulationProperties.numBoids) {
+        while (this.boids.length < this.worldProperties.numBoids) {
             const cohortSeed = Math.random();
             // more detailed cohort information is determined in updateCohorts, called below
             let cohortProperties: CohortProperties = {cohort: 0, color: "green", cohortSeed: cohortSeed};
@@ -390,7 +397,7 @@ class World {
             const boid = new Boid(
                 (Math.random() * 0.8 + 0.1) * this.boidProperties.width,
                 (Math.random() * 0.8 + 0.1) * this.boidProperties.height,
-                1, Math.random() * 2 * Math.PI, this.boidProperties, this.boidPopulationProperties, cohortProperties);
+                1, Math.random() * 2 * Math.PI, this.boidProperties, this.worldProperties, cohortProperties);
 
             this.boids.push(boid);
 
@@ -399,8 +406,8 @@ class World {
             this.spaceBuckets[xBucket][yBucket].push(boid);
         }
 
-        if (this.boids.length > this.boidPopulationProperties.numBoids) {
-            this.boids.length = this.boidPopulationProperties.numBoids;
+        if (this.boids.length > this.worldProperties.numBoids) {
+            this.boids.length = this.worldProperties.numBoids;
         }
 
         this.updateCohorts();
@@ -408,11 +415,11 @@ class World {
 
     updateCohorts() {
         // todo: we need safety checking and reasonable fallback for bad values
-        this.colors = this.boidPopulationProperties.colors.split(',');
+        this.colors = this.worldProperties.colors.split(',');
 
         for (const boid of this.boids) {
             const cohortProperties = boid.cohortProperties;
-            if (this.boidPopulationProperties.continuousCohorts) {
+            if (this.worldProperties.continuousCohorts) {
                 cohortProperties.cohort = 360 * cohortProperties.cohortSeed;
                 cohortProperties.color = `hsl(${cohortProperties.cohort} 80% 60%)`;
             } else {
@@ -568,7 +575,7 @@ function extendControlPanel<Properties extends IndexableProperties>(
 }
 
 const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
-extendControlPanel(world.boidPopulationProperties, BOID_POPULATION_PROPERTIES_DEFAULT, controlPanel, 
+extendControlPanel(world.worldProperties, WORLD_PROPERTIES_DEFAULT, controlPanel, 
     () => {world.updateNumBoids()});
 extendControlPanel(world.spaceBucketProperties, SPACE_BUCKET_PROPERTIES_DEFAULT, controlPanel, 
     () => {world.resetSpaceBuckets()});
