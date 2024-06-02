@@ -121,7 +121,7 @@ function boidDistance(boidA: Boid, boidB: Boid): number {
 }
 
 class Boid {
-    constructor(public x: number, public y: number, public speed: number, public direction: number, 
+    constructor(public x: number, public y: number, public speed: number, direction: number, 
         boidProperties: BoidProperties, derivedBoidProperties: DerivedBoidProperties,
         worldProperties: WorldProperties, cohortProperties: CohortProperties) {
         
@@ -150,8 +150,8 @@ class Boid {
         // turns out save/restore/rotate/translate are a little pricey for how lightly this uses them.
         // doing the equiv work by hand shaves off a non-trivial hunk of cpu time.
 
-        const cos = Math.cos(this.direction);
-        const sin = Math.sin(this.direction);
+        const cos = this.speed > 0 ? this.vx / this.speed : 1;
+        const sin = this.speed > 0 ? this.vy / this.speed : 0;
 
         context.beginPath();
         context.moveTo(Math.floor(this.x + 7 * cos), Math.floor(this.y + 7 * sin));
@@ -159,6 +159,11 @@ class Boid {
         context.lineTo(Math.floor(this.x + 3 * sin), Math.floor(this.y + -3 * cos));
         context.closePath();
 
+        /*
+        context.beginPath();
+        context.rect(Math.floor(this.x), Math.floor(this.y), 1, 1);
+        context.closePath();
+        */
         context.fillStyle = this.cohortProperties.color;
         context.fill();
     }
@@ -322,8 +327,6 @@ class Boid {
             this.vx *= speedScale;
             this.vy *= speedScale;
         } // just going to ignore the === 0 case for now
-                
-        this.direction = Math.atan2(this.vy, this.vx);
     }
 }
 
