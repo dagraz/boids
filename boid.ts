@@ -98,6 +98,16 @@ const BOID_PROPERTIES_DEFAULT: BoidProperties = {
     inverseSquareAvoidance: true,
 };
 
+interface DerivedBoidProperties {
+    maxAccelerationSq: number;
+    awarenessRadiusSq: number;
+}
+
+const DERIVED_BOID_PROPERTIES_DEFAULT: DerivedBoidProperties = {
+    maxAccelerationSq: square(BOID_PROPERTIES_DEFAULT.maxAcceleration),
+    awarenessRadiusSq: square(BOID_PROPERTIES_DEFAULT.awarenessRadius),
+};
+
 function square(x: number): number {
     return x * x;
 }
@@ -112,7 +122,8 @@ function boidDistance(boidA: Boid, boidB: Boid): number {
 
 class Boid {
     constructor(public x: number, public y: number, public speed: number, public direction: number, 
-        boidProperties: BoidProperties, worldProperties: WorldProperties, cohortProperties: CohortProperties) {
+        boidProperties: BoidProperties, derivedBoidProperties: DerivedBoidProperties,
+        worldProperties: WorldProperties, cohortProperties: CohortProperties) {
         
         this.vx = speed * Math.cos(direction);
         this.vy = speed * Math.sin(direction);
@@ -122,6 +133,7 @@ class Boid {
         this.cohortProperties = cohortProperties;
         this.worldProperties = worldProperties;
         this.boidProperties = boidProperties;
+        this.derivedBoidProperties = derivedBoidProperties;
     }
 
     vx: number;
@@ -132,6 +144,7 @@ class Boid {
     cohortProperties: CohortProperties;
     worldProperties: WorldProperties;
     boidProperties: BoidProperties;
+    derivedBoidProperties: DerivedBoidProperties;
 
     public draw(context: CanvasRenderingContext2D) {
         // turns out save/restore/rotate/translate are a little pricey for how lightly this uses them.
@@ -267,20 +280,21 @@ class Boid {
             const diffY = this.y - mousePosition.y;
             const distanceSq = Math.max(1, square(diffX) + square(diffY));
 
-            const distanceFactor = this.boidProperties.inverseSquareAvoidance ?
-                distanceSq * Math.sqrt(distanceSq) :
-                distanceSq;
+            if (distanceSq < this.derivedBoidProperties.awarenessRadiusSq) {
+                const distanceFactor = this.boidProperties.inverseSquareAvoidance ?
+                    distanceSq * Math.sqrt(distanceSq) :
+                    distanceSq;
 
-            const mouseAvoidScale = this.boidProperties.mouseAvoidance / distanceFactor;
-            this.deltaVx += diffX * mouseAvoidScale;
-            this.deltaVy += diffY * mouseAvoidScale;
+                const mouseAvoidScale = this.boidProperties.mouseAvoidance / distanceFactor;
+                this.deltaVx += diffX * mouseAvoidScale;
+                this.deltaVy += diffY * mouseAvoidScale;
+            }
         }
 
         // cap acceleration
-        // We only need the sqrt when the cap is active. 
-        // todo: fix
-        const deltaVMagnitude = Math.sqrt(square(this.deltaVx) + square(this.deltaVy));
-        if (deltaVMagnitude > this.boidProperties.maxAcceleration) {
+        const deltaVMagnitudeSq = square(this.deltaVx) + square(this.deltaVy);
+        if (deltaVMagnitudeSq > this.derivedBoidProperties.maxAccelerationSq) {
+            const deltaVMagnitude = Math.sqrt(deltaVMagnitudeSq);
             const accelerationScale = this.boidProperties.maxAcceleration / deltaVMagnitude;
             this.deltaVx *= accelerationScale;
             this.deltaVy *= accelerationScale;
@@ -298,8 +312,6 @@ class Boid {
         this.vx += this.deltaVx;
         this.vy += this.deltaVy;
 
-        // minor optimization opportunity:
-        // pre-cache min/max speed squared and use that.  calc the sqrt only if needed
         this.speed = Math.sqrt(square(this.vx) + square(this.vy));
         if (this.speed < this.boidProperties.minSpeed && this.speed > 0) {
             const speedScale = this.boidProperties.minSpeed / this.speed;
@@ -322,6 +334,7 @@ class World {
     public boids: Boid[];
 
     boidProperties: BoidProperties;
+    derivedBoidProperties: DerivedBoidProperties
     worldProperties: WorldProperties;
     spaceBucketProperties: SpaceBucketProperties;
     colors: string[];
@@ -340,6 +353,11 @@ class World {
         return Math.floor(cleanY / this.spaceBucketProperties.bucketSize);
     }
 
+    updateDerivedBoidProperties() {
+        this.derivedBoidProperties.awarenessRadiusSq = square(this.boidProperties.awarenessRadius);
+        this.derivedBoidProperties.maxAccelerationSq = square(this.boidProperties.maxAcceleration);
+    }
+
     constructor(canvas: HTMLCanvasElement,
         boidProperties: Partial<BoidProperties>, 
         bpp: Partial<WorldProperties>) {
@@ -351,6 +369,9 @@ class World {
             height: canvas.height,
             ...boidProperties
         };
+
+        this.derivedBoidProperties = {... DERIVED_BOID_PROPERTIES_DEFAULT};
+        this.updateDerivedBoidProperties();
 
         this.spaceBucketProperties = SPACE_BUCKET_PROPERTIES_DEFAULT;
 
@@ -406,7 +427,9 @@ class World {
             const boid = new Boid(
                 (Math.random() * 0.8 + 0.1) * this.boidProperties.width,
                 (Math.random() * 0.8 + 0.1) * this.boidProperties.height,
-                1, Math.random() * 2 * Math.PI, this.boidProperties, this.worldProperties, cohortProperties);
+                1, Math.random() * 2 * Math.PI, 
+                this.boidProperties, this.derivedBoidProperties,
+                this.worldProperties, cohortProperties);
 
             this.boids.push(boid);
 
@@ -468,7 +491,6 @@ class World {
     getNearBoids(boid: Boid): [boid: Boid, distanceSq: number][] {   
         let nearBoids: [boid: Boid, distancesq: number][] = [];
         const awarenessRadius = this.boidProperties.awarenessRadius;
-        const sqAwarenessRadius = square(awarenessRadius);
 
         const minXBucket = this.xToBucket(boid.x - awarenessRadius);
         const maxXBucket = this.xToBucket(boid.x + awarenessRadius);
@@ -483,7 +505,7 @@ class World {
                     }
 
                     const distanceSq = boidDistanceSq(boid, otherBoid);
-                    if (distanceSq < sqAwarenessRadius) {
+                    if (distanceSq < this.derivedBoidProperties.awarenessRadiusSq) {
                         nearBoids.push([otherBoid, distanceSq]);
                     }
                 }
@@ -588,6 +610,8 @@ extendControlPanel(world.worldProperties, WORLD_PROPERTIES_DEFAULT, controlPanel
     () => {world.updateNumBoids()});
 extendControlPanel(world.spaceBucketProperties, SPACE_BUCKET_PROPERTIES_DEFAULT, controlPanel, 
     () => {world.resetSpaceBuckets()});
-extendControlPanel(world.boidProperties, BOID_PROPERTIES_DEFAULT, controlPanel);
+extendControlPanel(world.boidProperties, BOID_PROPERTIES_DEFAULT, controlPanel,
+    () => {world.updateDerivedBoidProperties()});
+ 
 
 cycle();
