@@ -156,7 +156,7 @@ class Boid {
             return this.boidProperties.edgeAvoidance;
         } else {
             if (this.boidProperties.inverseSquareAvoidance) {
-                return this.boidProperties.edgeAvoidance / edgeDistance / edgeDistance;
+                return this.boidProperties.edgeAvoidance / (edgeDistance * edgeDistance);
             } else {
                 return this.boidProperties.edgeAvoidance / edgeDistance;
             }
@@ -229,8 +229,9 @@ class Boid {
                 distanceSq * Math.sqrt(distanceSq) :
                 distanceSq;
 
-            this.deltaVx += diffX / distanceFactor * this.boidProperties.separation;
-            this.deltaVy += diffY / distanceFactor * this.boidProperties.separation;
+            const separationScale = this.boidProperties.separation / distanceFactor;
+            this.deltaVx += diffX * separationScale;
+            this.deltaVy += diffY * separationScale;
         }
 
         if (numBoids > 0) {
@@ -260,8 +261,10 @@ class Boid {
             const distanceFactor = this.boidProperties.inverseSquareAvoidance ?
                 distanceSq * Math.sqrt(distanceSq) :
                 distanceSq;
-            this.deltaVx += diffX / distanceFactor * this.boidProperties.mouseAvoidance;
-            this.deltaVy += diffY / distanceFactor * this.boidProperties.mouseAvoidance;
+
+            const mouseAvoidScale = this.boidProperties.mouseAvoidance / distanceFactor;
+            this.deltaVx += diffX * mouseAvoidScale;
+            this.deltaVy += diffY * mouseAvoidScale;
         }
 
         // cap acceleration
