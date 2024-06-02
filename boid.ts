@@ -187,9 +187,9 @@ class Boid {
                 
             const distanceFromEdge = 0.5 * Math.min(this.boidProperties.width, this.boidProperties.height) - 
                 distanceFromCenter;
-            const edgeAvoidance = this.edgeAvoidance(distanceFromEdge);
-            this.deltaVx += edgeAvoidance * (centerWidth - this.x) / distanceFromCenter;
-            this.deltaVy += edgeAvoidance * (centerHeight - this.y) / distanceFromCenter;
+            const edgeAvoidanceScale = this.edgeAvoidance(distanceFromEdge) / distanceFromCenter;
+            this.deltaVx += edgeAvoidanceScale * (centerWidth - this.x);
+            this.deltaVy += edgeAvoidanceScale * (centerHeight - this.y);
         } else {
             // rectangular border
             this.deltaVx += this.edgeAvoidance(this.x);
@@ -281,8 +281,9 @@ class Boid {
         // todo: fix
         const deltaVMagnitude = Math.sqrt(square(this.deltaVx) + square(this.deltaVy));
         if (deltaVMagnitude > this.boidProperties.maxAcceleration) {
-            this.deltaVx *= this.boidProperties.maxAcceleration / deltaVMagnitude;
-            this.deltaVy *= this.boidProperties.maxAcceleration / deltaVMagnitude;
+            const accelerationScale = this.boidProperties.maxAcceleration / deltaVMagnitude;
+            this.deltaVx *= accelerationScale;
+            this.deltaVy *= accelerationScale;
         }
     }
 
@@ -301,11 +302,13 @@ class Boid {
         // pre-cache min/max speed squared and use that.  calc the sqrt only if needed
         this.speed = Math.sqrt(square(this.vx) + square(this.vy));
         if (this.speed < this.boidProperties.minSpeed && this.speed > 0) {
-            this.vx *= this.boidProperties.minSpeed / this.speed;
-            this.vy *= this.boidProperties.minSpeed / this.speed;
+            const speedScale = this.boidProperties.minSpeed / this.speed;
+            this.vx *= speedScale;
+            this.vy *= speedScale;
         } else if (this.speed > this.boidProperties.maxSpeed) {
-            this.vx *= this.boidProperties.maxSpeed / this.speed;
-            this.vy *= this.boidProperties.maxSpeed / this.speed;
+            const speedScale = this.boidProperties.maxSpeed / this.speed;
+            this.vx *= speedScale;
+            this.vy *= speedScale;
         } // just going to ignore the === 0 case for now
                 
         this.direction = Math.atan2(this.vy, this.vx);
