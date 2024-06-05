@@ -227,7 +227,7 @@ class Boid {
             if (this.worldProperties.continuousCohorts) {
                 let degreesDistance = Math.abs(otherBoid.cohortProperties.cohort - this.cohortProperties.cohort);
                 if (degreesDistance > 180) {
-                    degreesDistance -= 180;
+                    degreesDistance = 360 - degreesDistance;
                 }
                 
                 
