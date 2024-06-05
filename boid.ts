@@ -225,12 +225,18 @@ class Boid {
         for (const [otherBoid, distanceSq] of nearBoids) {
             // Boids will only cohere and align with members of the same cohort
             if (this.worldProperties.continuousCohorts) {
-                const baseWeight = Math.min(
-                    Math.abs(otherBoid.cohortProperties.cohort - this.cohortProperties.cohort),
-                    360 - Math.abs(otherBoid.cohortProperties.cohort - this.cohortProperties.cohort)) / 180;
-                const weight = this.worldProperties.homogenousCohorts ?
-                    1 - baseWeight :
-                    baseWeight;
+                let degreesDistance = Math.abs(otherBoid.cohortProperties.cohort - this.cohortProperties.cohort);
+                if (degreesDistance > 180) {
+                    degreesDistance -= 180;
+                }
+                
+                
+                // todo: figure out homogenous cohorts
+                const weight =
+                    (this.worldProperties.homogenousCohorts) ?
+                    Math.max(90 - degreesDistance, 0) / 90 :
+                    Math.max(degreesDistance - 90, 0) / 90;
+
                 
                 sumX += otherBoid.x * weight;
                 sumY += otherBoid.y * weight;
