@@ -11,12 +11,7 @@
 //    * allow for per-field data validation and conversion (e.g. float vs int, positive values, etc)
 //    * more elegant per-field callback specification instead of per-interface
 //  * 3d!
-//  * optimization
-//    * I bet draw can be made leaner.  experiment with pre-rendering ~100 boids at different rotations and use canvas.drawImage
-//    * better understand heap usage.  there is a *lot* of churn in there, it should be possible for there to be almost none.
-//    * try moving from boid pointers to indices
-//
-// When using inverseSquare avoidance, drop cohesion by an order of magnitude and double seperation.
+
 
 // used for runtime property changes
 interface IndexableProperties {
@@ -35,6 +30,9 @@ interface WorldProperties extends IndexableProperties {
     homogenousCohorts: boolean;
     colors: string;
     gravity: number;
+    width: number;
+    height: number;
+    circularBorder: boolean;
 }
 
 const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
@@ -43,6 +41,9 @@ const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
     homogenousCohorts: true,
     colors: "red, blue",
     gravity: 0,
+    width: 1000,
+    height: 800,
+    circularBorder: false,
 }
 
 interface SpaceBucketProperties extends IndexableProperties {
@@ -54,10 +55,6 @@ const SPACE_BUCKET_PROPERTIES_DEFAULT: SpaceBucketProperties = {
 }
 
 interface BoidProperties extends IndexableProperties {
-    width: number;
-    height: number;
-    circularBorder: boolean;
-
     // Global parameters for boid behavior
     minSpeed: number;
     maxSpeed: number;
@@ -81,10 +78,6 @@ interface BoidProperties extends IndexableProperties {
 };
 
 const BOID_PROPERTIES_DEFAULT: BoidProperties = {
-    width: 1000,
-    height: 800,
-    circularBorder: false,
-
     minSpeed: 0.75,
     maxSpeed: 2,
     maxAcceleration: 0.2,
@@ -159,11 +152,6 @@ class Boid {
         context.lineTo(Math.floor(this.x + 3 * sin), Math.floor(this.y + -3 * cos));
         context.closePath();
 
-        /*
-        context.beginPath();
-        context.rect(Math.floor(this.x), Math.floor(this.y), 1, 1);
-        context.closePath();
-        */
         context.fillStyle = this.cohortProperties.color;
         context.fill();
     }
@@ -198,12 +186,12 @@ class Boid {
 
         // avoid edges
         if (this.boidProperties.circularBorder) {
-            const centerWidth = 0.5 * this.boidProperties.width;
-            const centerHeight = 0.5 * this.boidProperties.height;
+            const centerWidth = 0.5 * this.worldProperties.width;
+            const centerHeight = 0.5 * this.worldProperties.height;
             const distanceFromCenter = Math.sqrt(
                 square(this.x - centerWidth) + square(this.y - centerHeight));
                 
-            const distanceFromEdge = 0.5 * Math.min(this.boidProperties.width, this.boidProperties.height) - 
+            const distanceFromEdge = 0.5 * Math.min(this.worldProperties.width, this.worldProperties.height) - 
                 distanceFromCenter;
             const edgeAvoidanceScale = this.edgeAvoidance(distanceFromEdge) / distanceFromCenter;
             this.deltaVx += edgeAvoidanceScale * (centerWidth - this.x);
@@ -211,9 +199,9 @@ class Boid {
         } else {
             // rectangular border
             this.deltaVx += this.edgeAvoidance(this.x);
-            this.deltaVx -= this.edgeAvoidance(this.boidProperties.width - this.x);
+            this.deltaVx -= this.edgeAvoidance(this.worldProperties.width - this.x);
             this.deltaVy += this.edgeAvoidance(this.y);
-            this.deltaVy -= this.edgeAvoidance(this.boidProperties.height - this.y);
+            this.deltaVy -= this.edgeAvoidance(this.worldProperties.height - this.y);
         }
 
         let sumX = 0;
@@ -229,15 +217,12 @@ class Boid {
                 if (degreesDistance > 180) {
                     degreesDistance = 360 - degreesDistance;
                 }
-                
-                
-                // todo: figure out homogenous cohorts
+                   
                 const weight =
                     (this.worldProperties.homogenousCohorts) ?
                     Math.max(90 - degreesDistance, 0) / 90 :
                     Math.max(degreesDistance - 90, 0) / 90;
 
-                
                 sumX += otherBoid.x * weight;
                 sumY += otherBoid.y * weight;
                 sumVx += otherBoid.vx * weight;
@@ -328,10 +313,12 @@ class Boid {
             const speedScale = this.boidProperties.minSpeed / this.speed;
             this.vx *= speedScale;
             this.vy *= speedScale;
+            this.speed = this.boidProperties.minSpeed;
         } else if (this.speed > this.boidProperties.maxSpeed) {
             const speedScale = this.boidProperties.maxSpeed / this.speed;
             this.vx *= speedScale;
             this.vy *= speedScale;
+            this.speed = this.boidProperties.maxSpeed;
         } // just going to ignore the === 0 case for now
     }
 }
@@ -353,12 +340,12 @@ class World {
     spaceBuckets: Boid[][][];
 
     xToBucket(x: number): number {
-        const cleanX = Math.min(this.boidProperties.width, Math.max(0, x));
+        const cleanX = Math.min(this.worldProperties.width, Math.max(0, x));
         return Math.floor(cleanX / this.spaceBucketProperties.bucketSize);
     }
 
     yToBucket(y: number): number {
-        const cleanY = Math.min(this.boidProperties.height, Math.max(0, y));
+        const cleanY = Math.min(this.worldProperties.height, Math.max(0, y));
         return Math.floor(cleanY / this.spaceBucketProperties.bucketSize);
     }
 
@@ -434,8 +421,8 @@ class World {
             let cohortProperties: CohortProperties = {cohort: 0, color: "green", cohortSeed: cohortSeed};
 
             const boid = new Boid(
-                (Math.random() * 0.8 + 0.1) * this.boidProperties.width,
-                (Math.random() * 0.8 + 0.1) * this.boidProperties.height,
+                Math.random() * this.worldProperties.width,
+                Math.random() * this.worldProperties.height,
                 1, Math.random() * 2 * Math.PI, 
                 this.boidProperties, this.derivedBoidProperties,
                 this.worldProperties, cohortProperties);
