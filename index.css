@@ -2,3 +2,10 @@
     width: 1000px;
     height: 800px;
 }
+
+.two-columns {
+    display:flex;
+    flex-wrap:wrap;
+    flex-direction:row;
+}
+

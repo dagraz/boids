@@ -7,9 +7,11 @@
 //  * screen res
 //    * provide option to match visible screen
 //    * move screen res to a separate struct and make sure it DoesTheRightThing
-//  * runtime property changes
+//  * configuration changes
 //    * allow for per-field data validation and conversion (e.g. float vs int, positive values, etc)
 //    * more elegant per-field callback specification instead of per-interface
+//    * clean up control panel some.  
+//    * add ability to specify properties by cgi param
 //  * 3d!
 
 
@@ -30,8 +32,8 @@ interface WorldProperties extends IndexableProperties {
     homogenousCohorts: boolean;
     colors: string;
     gravity: number;
-    width: number;
-    height: number;
+    width: number;  // todo: either make this a real config param or move it
+    height: number;  // todo: either make this a real config param or move it
     circularBorder: boolean;
 }
 
@@ -41,8 +43,8 @@ const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
     homogenousCohorts: true,
     colors: "red, blue",
     gravity: 0,
-    width: 1000,
-    height: 800,
+    width: -1,
+    height: -1,
     circularBorder: false,
 }
 
@@ -360,6 +362,7 @@ class World {
 
         this.canvas = canvas;
         this.context = canvas.getContext("2d", {alpha: false}) as CanvasRenderingContext2D;
+        // todo: same bug as below.  get rid of useless width/height settings
         this.boidProperties = {...BOID_PROPERTIES_DEFAULT, 
             width: canvas.width,
             height: canvas.height,
@@ -376,7 +379,10 @@ class World {
         //    Type 'undefined' is not assignable to type 'string | number | boolean'.ts(2322)
         // weirdly, this compiles fine in 4.5.4.  Poking around online finds complaints of this error in similar contexts in the 2.x series.  
         // possible regression?
-        this.worldProperties = {...WORLD_PROPERTIES_DEFAULT, numBoids: WORLD_PROPERTIES_DEFAULT.numBoids, ...bpp};
+        this.worldProperties = {...WORLD_PROPERTIES_DEFAULT, numBoids: WORLD_PROPERTIES_DEFAULT.numBoids, ...bpp,
+            width: canvas.width,
+            height: canvas.height,
+        };
 
         this.colors = [];
 
@@ -521,8 +527,8 @@ class World {
 }
 
 let canvas = document.getElementsByTagName("canvas")[0];
-canvas.width = 1000;
-canvas.height = 800;    
+canvas.width = canvas.clientWidth;
+canvas.height = canvas.clientHeight;    
 
 const world = new World(canvas,
     {circularBorder: false, }, {numBoids: 500, continuousCohorts: false, homogenousCohorts: true, });
@@ -582,6 +588,9 @@ function extendControlPanel<Properties extends IndexableProperties>(
         label.appendChild(input);
         
         controlPanel.appendChild(label);
+
+        const br = document.createElement('br');
+        controlPanel.appendChild(br);
         
         input.addEventListener("change", () => {
             if (typeof properties[key] === "number") {
