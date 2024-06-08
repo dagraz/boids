@@ -182,12 +182,12 @@ class Boid {
 
         if (this.boidProperties.linearDrag > 0) {
             // while we're here and already have the speed calculated
-            this.deltaVx = - this.vx * this.boidProperties.linearDrag;
-            this.deltaVy = - this.vy * this.boidProperties.linearDrag;
+            this.deltaVx -= this.vx * this.boidProperties.linearDrag;
+            this.deltaVy -= this.vy * this.boidProperties.linearDrag;
         }
 
         // avoid edges
-        if (this.boidProperties.circularBorder) {
+        if (this.worldProperties.circularBorder) {
             const centerWidth = 0.5 * this.worldProperties.width;
             const centerHeight = 0.5 * this.worldProperties.height;
             const distanceFromCenter = Math.sqrt(
@@ -230,7 +230,11 @@ class Boid {
                 sumVx += otherBoid.vx * weight;
                 sumVy += otherBoid.vy * weight;
                 numBoids += weight;
-            } else if (otherBoid.cohortProperties.cohort === this.cohortProperties.cohort) {
+            } else if (
+                this.worldProperties.homogenousCohorts &&    
+                otherBoid.cohortProperties.cohort === this.cohortProperties.cohort ||
+                !this.worldProperties.homogenousCohorts && 
+                otherBoid.cohortProperties.cohort !== this.cohortProperties.cohort) {
                 sumX += otherBoid.x;
                 sumY += otherBoid.y;
                 sumVx += otherBoid.vx;
@@ -364,8 +368,7 @@ class World {
         this.context = canvas.getContext("2d", {alpha: false}) as CanvasRenderingContext2D;
         // todo: same bug as below.  get rid of useless width/height settings
         this.boidProperties = {...BOID_PROPERTIES_DEFAULT, 
-            width: canvas.width,
-            height: canvas.height,
+            maxSpeed: 2,
             ...boidProperties
         };
 
@@ -531,7 +534,7 @@ canvas.width = canvas.clientWidth;
 canvas.height = canvas.clientHeight;    
 
 const world = new World(canvas,
-    {circularBorder: false, }, {numBoids: 500, continuousCohorts: false, homogenousCohorts: true, });
+    {}, {numBoids: 500, continuousCohorts: false, homogenousCohorts: true, });
 
 canvas.addEventListener("mousemove", (e) => {
     if (world.mousePosition === null) {
@@ -568,9 +571,17 @@ function cycle() {
 
 
 function extendControlPanel<Properties extends IndexableProperties>(
+    sectionTitle: string,
     properties: Properties, defaultProperties: Properties, controlPanel: HTMLDivElement,
     update?: () => void) {
+    const controlPanelSection = document.createElement('p');
+    controlPanelSection.innerHTML = sectionTitle;
+    controlPanel.appendChild(controlPanelSection);
+
     for (const [kkey, value] of Object.entries(properties)) {
+        const br = document.createElement('br');
+        controlPanelSection.appendChild(br);
+        
         const key = kkey as keyof Properties;
         const input = document.createElement('input') as HTMLInputElement;
         input.setAttribute('name', key as string);
@@ -587,11 +598,8 @@ function extendControlPanel<Properties extends IndexableProperties>(
         label.innerHTML = key as string;
         label.appendChild(input);
         
-        controlPanel.appendChild(label);
+        controlPanelSection.appendChild(label);
 
-        const br = document.createElement('br');
-        controlPanel.appendChild(br);
-        
         input.addEventListener("change", () => {
             if (typeof properties[key] === "number") {
                 const value = parseFloat(input.value);
@@ -611,11 +619,11 @@ function extendControlPanel<Properties extends IndexableProperties>(
 }
 
 const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
-extendControlPanel(world.worldProperties, WORLD_PROPERTIES_DEFAULT, controlPanel, 
+extendControlPanel("World Properties", world.worldProperties, WORLD_PROPERTIES_DEFAULT, controlPanel, 
     () => {world.updateNumBoids()});
-extendControlPanel(world.spaceBucketProperties, SPACE_BUCKET_PROPERTIES_DEFAULT, controlPanel, 
+extendControlPanel("Space Bucket Properties", world.spaceBucketProperties, SPACE_BUCKET_PROPERTIES_DEFAULT, controlPanel, 
     () => {world.resetSpaceBuckets()});
-extendControlPanel(world.boidProperties, BOID_PROPERTIES_DEFAULT, controlPanel,
+extendControlPanel("Boid Properties", world.boidProperties, BOID_PROPERTIES_DEFAULT, controlPanel,
     () => {world.updateDerivedBoidProperties()});
  
 
