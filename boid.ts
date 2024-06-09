@@ -6,7 +6,8 @@
 //  * configuration changes
 //    * allow for per-field data validation and conversion (e.g. float vs int, positive values, valid colors, etc)
 //    * make control panel more legible
-//    * add ability to specify properties by cgi param
+//    * more paranoia for vetting cgi input, esp strings
+//    * create a link with cgi params filled in
 //  * 3d!
 
 
