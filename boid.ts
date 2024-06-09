@@ -4,9 +4,13 @@
 //
 // todo: 
 //  * configuration changes
+//    * legibility
+//      * make control panel more legible
+//      * figure out how to make the generated URL wrap or be in a scrolling box or something
 //    * allow for per-field data validation and conversion (e.g. float vs int, positive values, valid colors, etc)
-//    * make control panel more legible
-//    * create a link with cgi params filled in
+//    * use color picker for user set colors
+//  * configuration / property management (on-page control-panel, cgi parsing, url generation) 
+//    feels like it could be cleaned up and wrapped into a separate library.
 //  * 3d!
 
 
@@ -661,7 +665,7 @@ function updatePropertiesFromCgi<Properties extends IndexableProperties>(
 
 const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
 
-const worldPropertiesControlPanelOptions: ControlPanelOptions<WorldProperties> = {
+const worldPropertiesOptions: ControlPanelOptions<WorldProperties> = {
     width: {skip: true},
     height: {skip: true},
     numBoids: {updateFunction: () => {world.updateNumBoids();}},
@@ -669,9 +673,9 @@ const worldPropertiesControlPanelOptions: ControlPanelOptions<WorldProperties> =
     cohortColors: {updateFunction: () => {world.updateCohorts();}},
 };
 updatePropertiesFromCgi("wp", world.worldProperties, WORLD_PROPERTIES_DEFAULT, 
-    worldPropertiesControlPanelOptions);
+    worldPropertiesOptions);
 extendControlPanel("World Properties", world.worldProperties, WORLD_PROPERTIES_DEFAULT, 
-    worldPropertiesControlPanelOptions, controlPanel);
+    worldPropertiesOptions, controlPanel);
 
 const spaceBucketPropertiesOptions: ControlPanelOptions<SpaceBucketProperties> = {
     bucketSize: {updateFunction: () => {world.resetSpaceBuckets()}},
@@ -687,6 +691,41 @@ const boidPropertiesOptions: ControlPanelOptions<BoidProperties> = {
 };
 updatePropertiesFromCgi("bp", world.boidProperties, BOID_PROPERTIES_DEFAULT, boidPropertiesOptions);
 extendControlPanel("Boid Properties", world.boidProperties, BOID_PROPERTIES_DEFAULT, boidPropertiesOptions, controlPanel);
+
+function setCgiParams<Properties extends IndexableProperties>(
+    prefix: string, 
+    properties: Properties,
+    defaultProperties: Properties,
+    propertyOptions: ControlPanelOptions<Properties>,
+    searchParams: URLSearchParams)
+{
+    for(const [key, value] of Object.entries(properties)) {
+        const paramOptions = propertyOptions[key];
+        if (paramOptions && paramOptions.skip) {
+            continue;
+        }
+
+        if (value != defaultProperties[key]) {
+            searchParams.set(prefix + '.' + key, `${value}`);
+        }
+    }
+
+}
+
+function getUrl() {
+    const url = new URL(window.location.href);
+    const searchParams = url.searchParams;
+    
+    setCgiParams("wp", world.worldProperties, WORLD_PROPERTIES_DEFAULT, worldPropertiesOptions, searchParams);
+    setCgiParams("sp", world.spaceBucketProperties, SPACE_BUCKET_PROPERTIES_DEFAULT, spaceBucketPropertiesOptions, searchParams);
+    setCgiParams("bp", world.boidProperties, BOID_PROPERTIES_DEFAULT, boidPropertiesOptions, searchParams);
+
+    const gottenUrl = document.getElementById("gottenUrl") as HTMLElement;
+    gottenUrl.innerHTML = url.toString();
+}
+
+const getUrlButton = document.getElementById("getUrlButton") as HTMLElement;
+getUrlButton.addEventListener("click", getUrl);
 
 
 function cycle() {

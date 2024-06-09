@@ -12,3 +12,7 @@
 .controlPanel {
     padding: 5px;
 }
+
+#gottenUrl {
+    text-wrap: wrap;
+}
