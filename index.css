@@ -9,3 +9,6 @@
     flex-direction:row;
 }
 
+.controlPanel {
+    padding: 5px;
+}

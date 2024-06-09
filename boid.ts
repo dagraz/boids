@@ -5,11 +5,9 @@
 //
 // todo: 
 //  * screen res
-//    * provide option to match visible screen
 //    * move screen res to a separate struct and make sure it DoesTheRightThing
 //  * configuration changes
 //    * allow for per-field data validation and conversion (e.g. float vs int, positive values, etc)
-//    * more elegant per-field callback specification instead of per-interface
 //    * clean up control panel some.  
 //    * add ability to specify properties by cgi param
 //  * 3d!
@@ -30,7 +28,7 @@ interface WorldProperties extends IndexableProperties {
     numBoids: number;
     continuousCohorts: boolean;
     homogenousCohorts: boolean;
-    colors: string;
+    cohortColors: string;
     gravity: number;
     width: number;  // todo: either make this a real config param or move it
     height: number;  // todo: either make this a real config param or move it
@@ -41,12 +39,13 @@ const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
     numBoids: 500,
     continuousCohorts: false,
     homogenousCohorts: true,
-    colors: "red, blue",
+    cohortColors: "red, blue",
     gravity: 0,
     width: -1,
     height: -1,
     circularBorder: false,
 }
+
 
 interface SpaceBucketProperties extends IndexableProperties {
     bucketSize: number;
@@ -88,7 +87,7 @@ const BOID_PROPERTIES_DEFAULT: BoidProperties = {
     cohesion: 0.0025,
     alignment: 0.025,
     linearDrag: 0.0025,
-    mouseAvoidance: 5,
+    mouseAvoidance: 50,
     edgeAvoidance: 5,
     inverseSquareAvoidance: true,
 };
@@ -345,21 +344,6 @@ class World {
 
     spaceBuckets: Boid[][][];
 
-    xToBucket(x: number): number {
-        const cleanX = Math.min(this.worldProperties.width, Math.max(0, x));
-        return Math.floor(cleanX / this.spaceBucketProperties.bucketSize);
-    }
-
-    yToBucket(y: number): number {
-        const cleanY = Math.min(this.worldProperties.height, Math.max(0, y));
-        return Math.floor(cleanY / this.spaceBucketProperties.bucketSize);
-    }
-
-    updateDerivedBoidProperties() {
-        this.derivedBoidProperties.awarenessRadiusSq = square(this.boidProperties.awarenessRadius);
-        this.derivedBoidProperties.maxAccelerationSq = square(this.boidProperties.maxAcceleration);
-    }
-
     constructor(canvas: HTMLCanvasElement,
         boidProperties: Partial<BoidProperties>, 
         bpp: Partial<WorldProperties>) {
@@ -397,6 +381,21 @@ class World {
         this.boids = []
 
         this.updateNumBoids();
+    }
+
+    xToBucket(x: number): number {
+        const cleanX = Math.min(this.worldProperties.width, Math.max(0, x));
+        return Math.floor(cleanX / this.spaceBucketProperties.bucketSize);
+    }
+
+    yToBucket(y: number): number {
+        const cleanY = Math.min(this.worldProperties.height, Math.max(0, y));
+        return Math.floor(cleanY / this.spaceBucketProperties.bucketSize);
+    }
+
+    updateDerivedBoidProperties() {
+        this.derivedBoidProperties.awarenessRadiusSq = square(this.boidProperties.awarenessRadius);
+        this.derivedBoidProperties.maxAccelerationSq = square(this.boidProperties.maxAcceleration);
     }
 
     resetSpaceBuckets() {
@@ -452,7 +451,7 @@ class World {
 
     updateCohorts() {
         // todo: we need safety checking and reasonable fallback for bad values
-        this.colors = this.worldProperties.colors.split(',');
+        this.colors = this.worldProperties.cohortColors.split(',');
 
         for (const boid of this.boids) {
             const cohortProperties = boid.cohortProperties;
@@ -533,8 +532,8 @@ let canvas = document.getElementsByTagName("canvas")[0];
 canvas.width = canvas.clientWidth;
 canvas.height = canvas.clientHeight;    
 
-const world = new World(canvas,
-    {}, {numBoids: 500, continuousCohorts: false, homogenousCohorts: true, });
+
+const world = new World(canvas, {}, {});
 
 canvas.addEventListener("mousemove", (e) => {
     if (world.mousePosition === null) {
@@ -561,24 +560,33 @@ canvas.addEventListener("click", (e) => {
     }
 });
   
-function cycle() {
-    world.updateBoids();
-    world.moveBoids();
-    world.drawBoids();
 
-    raf = window.requestAnimationFrame(cycle)
-}
+interface ControlPanelFieldOptions {
+    skip?: boolean;
+    updateFunction?: () => void;
+};
 
+type ControlPanelOptions<Properties> = {
+    [Key in keyof Properties]?: ControlPanelFieldOptions
+};
 
 function extendControlPanel<Properties extends IndexableProperties>(
     sectionTitle: string,
-    properties: Properties, defaultProperties: Properties, controlPanel: HTMLDivElement,
-    update?: () => void) {
+    properties: Properties, 
+    defaultProperties: Properties, 
+    propertyOptions: ControlPanelOptions<Properties>,
+    controlPanel: HTMLDivElement) {
+
     const controlPanelSection = document.createElement('p');
     controlPanelSection.innerHTML = sectionTitle;
     controlPanel.appendChild(controlPanelSection);
 
     for (const [kkey, value] of Object.entries(properties)) {
+        const fieldOptions = propertyOptions[kkey];
+        if (fieldOptions && fieldOptions.skip) {
+            continue;
+        }
+
         const br = document.createElement('br');
         controlPanelSection.appendChild(br);
         
@@ -611,20 +619,45 @@ function extendControlPanel<Properties extends IndexableProperties>(
                 properties[key] = input.value as Properties[typeof key];
             }
 
-            if (update !== undefined) {
-                update();
+            if (fieldOptions && fieldOptions.updateFunction !== undefined) {
+                fieldOptions.updateFunction();
             }
         });
     }
 }
 
 const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
-extendControlPanel("World Properties", world.worldProperties, WORLD_PROPERTIES_DEFAULT, controlPanel, 
-    () => {world.updateNumBoids()});
-extendControlPanel("Space Bucket Properties", world.spaceBucketProperties, SPACE_BUCKET_PROPERTIES_DEFAULT, controlPanel, 
-    () => {world.resetSpaceBuckets()});
-extendControlPanel("Boid Properties", world.boidProperties, BOID_PROPERTIES_DEFAULT, controlPanel,
-    () => {world.updateDerivedBoidProperties()});
+
+const worldPropertiesControlPanelOptions: ControlPanelOptions<WorldProperties> = {
+    width: {skip: true},
+    height: {skip: true},
+    numBoids: {updateFunction: () => {world.updateNumBoids();}},
+    continuousCohorts: {updateFunction: () => {world.updateCohorts();}},
+    cohortColors: {updateFunction: () => {world.updateCohorts();}},
+};
+extendControlPanel("World Properties", world.worldProperties, WORLD_PROPERTIES_DEFAULT, 
+    worldPropertiesControlPanelOptions, controlPanel);
+
+const spaceBucketPropertiesOptions: ControlPanelOptions<SpaceBucketProperties> = {
+    bucketSize: {updateFunction: () => {world.resetSpaceBuckets()}},
+};
+extendControlPanel("Space Bucket Properties", world.spaceBucketProperties, SPACE_BUCKET_PROPERTIES_DEFAULT, 
+    spaceBucketPropertiesOptions, controlPanel);
+
+const boidPropertiesOptions: ControlPanelOptions<BoidProperties> = {
+    awarenessRadius: {updateFunction: () => {world.updateDerivedBoidProperties()}},
+    maxAcceleration: {updateFunction: () => {world.updateDerivedBoidProperties()}},
+};
+extendControlPanel("Boid Properties", world.boidProperties, BOID_PROPERTIES_DEFAULT, boidPropertiesOptions, controlPanel);
+    
  
 
+function cycle() {
+    world.updateBoids();
+    world.moveBoids();
+    world.drawBoids();
+    
+    raf = window.requestAnimationFrame(cycle)
+}
+        
 cycle();
