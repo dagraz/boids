@@ -6,7 +6,6 @@
 //  * configuration changes
 //    * allow for per-field data validation and conversion (e.g. float vs int, positive values, valid colors, etc)
 //    * make control panel more legible
-//    * more paranoia for vetting cgi input, esp strings
 //    * create a link with cgi params filled in
 //  * 3d!
 
@@ -31,6 +30,8 @@ interface WorldProperties extends IndexableProperties {
     width: number;
     height: number;
     circularBorder: boolean;
+    backgroundColor: string;
+    backgroundOpacity: string;
 }
 
 const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
@@ -42,6 +43,8 @@ const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
     width: -1,
     height: -1,
     circularBorder: false,
+    backgroundColor: "white",
+    backgroundOpacity: "10%"
 }
 
 
@@ -432,8 +435,8 @@ class World {
     }
 
     updateCohorts() {
-        // todo: we need safety checking and reasonable fallback for bad values
-        this.colors = this.worldProperties.cohortColors.split(',');
+        this.colors = this.worldProperties.cohortColors.split(',')
+            .filter((value: string) => {return CSS.supports("color", value)});
 
         for (const boid of this.boids) {
             const cohortProperties = boid.cohortProperties;
@@ -450,7 +453,8 @@ class World {
 
     drawBoids() {
         //this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.context.fillStyle = "rgb(255 255 255 / 10%)";
+        //this.context.fillStyle = "rgb(255 255 255 / 10%)";
+        this.context.fillStyle = `rgb(from ${this.worldProperties.backgroundColor} r g b / ${this.worldProperties.backgroundOpacity})`;
         this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
         for (let boid of this.boids) {
             boid.draw(this.context);
@@ -565,8 +569,10 @@ function extendControlPanel<Properties extends IndexableProperties>(
     controlPanel.appendChild(controlPanelSection);
 
     for (const [kkey, value] of Object.entries(properties)) {
-        const fieldOptions = propertyOptions[kkey];
-        if (fieldOptions && fieldOptions.skip) {
+        const fieldOptions: ControlPanelFieldOptions = 
+            propertyOptions[kkey] || {} as ControlPanelFieldOptions;
+
+        if (fieldOptions.skip) {
             continue;
         }
 
@@ -602,7 +608,7 @@ function extendControlPanel<Properties extends IndexableProperties>(
                 properties[key] = input.value as Properties[typeof key];
             }
 
-            if (fieldOptions && fieldOptions.updateFunction !== undefined) {
+            if (fieldOptions.updateFunction !== undefined) {
                 fieldOptions.updateFunction();
             }
         });
@@ -627,8 +633,8 @@ function updatePropertiesFromCgi<Properties extends IndexableProperties>(
             continue;
         }
 
-        const fieldOptions = propertyOptions[key];
-        if (fieldOptions && fieldOptions.skip) {
+        const fieldOptions = propertyOptions[key] || {} as ControlPanelFieldOptions;
+        if (fieldOptions.skip) {
             continue;
         }
 
@@ -646,7 +652,7 @@ function updatePropertiesFromCgi<Properties extends IndexableProperties>(
             properties[key] = cgiValue as Properties[typeof key];
         }
 
-        if (fieldOptions && fieldOptions.updateFunction !== undefined) {
+        if (fieldOptions.updateFunction !== undefined) {
             fieldOptions.updateFunction();
         }
     }
