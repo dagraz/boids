@@ -1,12 +1,11 @@
 // taking inspiration from: 
 //  * https://dl.acm.org/doi/10.1145/280811.281008
-
 //  * https://vanhunteradams.com/Pico/Animal_Movement/Boids-algorithm.html
 //
 // todo: 
 //  * configuration changes
-//    * allow for per-field data validation and conversion (e.g. float vs int, positive values, etc)
-//    * clean up control panel some.  
+//    * allow for per-field data validation and conversion (e.g. float vs int, positive values, valid colors, etc)
+//    * make control panel more legible
 //    * add ability to specify properties by cgi param
 //  * 3d!
 
@@ -552,6 +551,7 @@ type ControlPanelOptions<Properties> = {
     [Key in keyof Properties]?: ControlPanelFieldOptions
 };
 
+
 function extendControlPanel<Properties extends IndexableProperties>(
     sectionTitle: string,
     properties: Properties, 
@@ -608,6 +608,50 @@ function extendControlPanel<Properties extends IndexableProperties>(
     }
 }
 
+function updatePropertiesFromCgi<Properties extends IndexableProperties>(
+    keyPrefix: string,
+    properties: Properties, 
+    defaultProperties: Properties, 
+    propertyOptions: ControlPanelOptions<Properties>) {
+
+    const params = new URLSearchParams(document.location.search);
+    for (const [cgiKey, cgiValue] of params.entries()) {
+        const segments = cgiKey.split('.');
+        if (segments.length != 2 || segments[0] !== keyPrefix) {
+            continue;
+        }
+
+        const key = segments[1] as keyof Properties;
+        if (!Object.keys(properties).includes(key as string)) {
+            continue;
+        }
+
+        const fieldOptions = propertyOptions[key];
+        if (fieldOptions && fieldOptions.skip) {
+            continue;
+        }
+
+        if (typeof properties[key] === "number") {
+            const value = parseFloat(cgiValue);
+            properties[key] = (isNaN(value) ?
+                defaultProperties[key] : value) as Properties[typeof key];
+        } else if (typeof properties[key] === "boolean") {
+            if (cgiValue === '') {
+                properties[key] = true as Properties[typeof key];
+            } else {
+                properties[key] = (cgiValue === 't' || cgiValue === 'true') as Properties[typeof key];
+            }
+        } else if (typeof properties[key] === "string") {
+            properties[key] = cgiValue as Properties[typeof key];
+        }
+
+        if (fieldOptions && fieldOptions.updateFunction !== undefined) {
+            fieldOptions.updateFunction();
+        }
+    }
+ }
+
+
 const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
 
 const worldPropertiesControlPanelOptions: ControlPanelOptions<WorldProperties> = {
@@ -617,12 +661,16 @@ const worldPropertiesControlPanelOptions: ControlPanelOptions<WorldProperties> =
     continuousCohorts: {updateFunction: () => {world.updateCohorts();}},
     cohortColors: {updateFunction: () => {world.updateCohorts();}},
 };
+updatePropertiesFromCgi("wp", world.worldProperties, WORLD_PROPERTIES_DEFAULT, 
+    worldPropertiesControlPanelOptions);
 extendControlPanel("World Properties", world.worldProperties, WORLD_PROPERTIES_DEFAULT, 
     worldPropertiesControlPanelOptions, controlPanel);
 
 const spaceBucketPropertiesOptions: ControlPanelOptions<SpaceBucketProperties> = {
     bucketSize: {updateFunction: () => {world.resetSpaceBuckets()}},
 };
+updatePropertiesFromCgi("sp", world.spaceBucketProperties, SPACE_BUCKET_PROPERTIES_DEFAULT, 
+    spaceBucketPropertiesOptions);
 extendControlPanel("Space Bucket Properties", world.spaceBucketProperties, SPACE_BUCKET_PROPERTIES_DEFAULT, 
     spaceBucketPropertiesOptions, controlPanel);
 
@@ -630,9 +678,9 @@ const boidPropertiesOptions: ControlPanelOptions<BoidProperties> = {
     awarenessRadius: {updateFunction: () => {world.updateDerivedBoidProperties()}},
     maxAcceleration: {updateFunction: () => {world.updateDerivedBoidProperties()}},
 };
+updatePropertiesFromCgi("bp", world.boidProperties, BOID_PROPERTIES_DEFAULT, boidPropertiesOptions);
 extendControlPanel("Boid Properties", world.boidProperties, BOID_PROPERTIES_DEFAULT, boidPropertiesOptions, controlPanel);
-    
- 
+
 
 function cycle() {
     world.updateBoids();
