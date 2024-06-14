@@ -47,8 +47,8 @@ const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
     width: -1,
     height: -1,
     circularBorder: false,
-    backgroundColor: "white",
-    backgroundOpacity: "10%"
+    backgroundColor: "#ffffff",
+    backgroundOpacity: "10"
 }
 
 
@@ -180,7 +180,7 @@ class Boid {
         this.deltaVy = 0;
 
         // gravity
-        if (this.worldProperties.gravity > 0) {
+        if (this.worldProperties.gravity != 0) {
             this.deltaVy += this.worldProperties.gravity;
         }
 
@@ -458,7 +458,7 @@ class World {
     drawBoids() {
         //this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
         //this.context.fillStyle = "rgb(255 255 255 / 10%)";
-        this.context.fillStyle = `rgb(from ${this.worldProperties.backgroundColor} r g b / ${this.worldProperties.backgroundOpacity})`;
+        this.context.fillStyle = `rgb(from ${this.worldProperties.backgroundColor} r g b / ${this.worldProperties.backgroundOpacity}%)`;
         this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
         for (let boid of this.boids) {
             boid.draw(this.context);
@@ -554,6 +554,9 @@ canvas.addEventListener("click", (e) => {
 interface ControlPanelFieldOptions {
     skip?: boolean;
     updateFunction?: () => void;
+    inputChecker?: (value: string) => boolean;
+    errorMessage?: string;
+    inputTypeOverride?: string;
 };
 
 type ControlPanelOptions<Properties> = {
@@ -588,7 +591,10 @@ function extendControlPanel<Properties extends IndexableProperties>(
         input.setAttribute('name', key as string);
         input.setAttribute('value', value.toString());
 
-        if (typeof properties[key] === "number") {
+
+        if (fieldOptions.inputTypeOverride !== undefined) {
+            input.setAttribute('type', fieldOptions.inputTypeOverride);
+        } else if (typeof properties[key] === "number") {
             input.setAttribute('type', 'number');
         } else if (typeof properties[key] === "boolean") {
             input.setAttribute('type', 'checkbox');
@@ -602,18 +608,27 @@ function extendControlPanel<Properties extends IndexableProperties>(
         controlPanelSection.appendChild(label);
 
         input.addEventListener("change", () => {
-            if (typeof properties[key] === "number") {
-                const value = parseFloat(input.value);
-                properties[key] = (isNaN(value) ?
-                    defaultProperties[key] : value) as Properties[typeof key];
-            } else if (typeof properties[key] === "boolean") {
-                properties[key] = input.checked as Properties[typeof key];
-            } else if (typeof properties[key] === "string") {
-                properties[key] = input.value as Properties[typeof key];
-            }
+            if (fieldOptions.inputChecker && !fieldOptions.inputChecker(input.value)) {
+                if (fieldOptions.errorMessage) {
+                    input.setCustomValidity(fieldOptions.errorMessage);
+                } else {
+                    input.setCustomValidity("invalid input");
+                }
+                input.reportValidity();
+            } else {
+                input.setCustomValidity("")
 
-            if (fieldOptions.updateFunction !== undefined) {
-                fieldOptions.updateFunction();
+                if (typeof properties[key] === "number") {
+                    properties[key] = parseFloat(input.value) as Properties[typeof key];
+                } else if (typeof properties[key] === "boolean") {
+                    properties[key] = input.checked as Properties[typeof key];
+                } else if (typeof properties[key] === "string") {
+                    properties[key] = input.value as Properties[typeof key];
+                }
+
+                if (fieldOptions.updateFunction !== undefined) {
+                    fieldOptions.updateFunction();
+                }
             }
         });
     }
@@ -642,10 +657,12 @@ function updatePropertiesFromCgi<Properties extends IndexableProperties>(
             continue;
         }
 
+        if (fieldOptions.inputChecker && !fieldOptions.inputChecker(cgiValue)) {
+            continue;
+        }
+
         if (typeof properties[key] === "number") {
-            const value = parseFloat(cgiValue);
-            properties[key] = (isNaN(value) ?
-                defaultProperties[key] : value) as Properties[typeof key];
+            properties[key] = parseFloat(cgiValue) as Properties[typeof key];
         } else if (typeof properties[key] === "boolean") {
             if (cgiValue === '') {
                 properties[key] = true as Properties[typeof key];
@@ -665,12 +682,47 @@ function updatePropertiesFromCgi<Properties extends IndexableProperties>(
 
 const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
 
+function stringNumChecker(requireInt: boolean, min?: number, max?: number): (input:string) => boolean {
+    return (input: string) => {
+        const n = parseFloat(input);
+        if (isNaN(n)) {
+            return false;
+        }
+
+        if (requireInt && n !== Math.trunc(n)) {
+            return false;
+        }
+
+        if (min !== undefined && n < min) {
+            return false;
+        }
+
+        if (max !== undefined && n > max) {
+            return false;
+        }
+
+        return true;
+    }
+}
+
 const worldPropertiesOptions: ControlPanelOptions<WorldProperties> = {
     width: {skip: true},
     height: {skip: true},
-    numBoids: {updateFunction: () => {world.updateNumBoids();}},
+    numBoids: {
+        updateFunction: () => {world.updateNumBoids();},
+        inputChecker: stringNumChecker(true, 0),
+        errorMessage: "numBoids must be a non-negative integer"
+    },
     continuousCohorts: {updateFunction: () => {world.updateCohorts();}},
     cohortColors: {updateFunction: () => {world.updateCohorts();}},
+    backgroundColor: {
+        inputTypeOverride: "color",
+        inputChecker: (value: string) => { return CSS.supports("color", value)},
+    },
+    backgroundOpacity: {
+        inputChecker: stringNumChecker(true, 0, 100),
+        errorMessage: "backgroundOpacity must be an integer in the range of [0-100]"
+    }
 };
 updatePropertiesFromCgi("wp", world.worldProperties, WORLD_PROPERTIES_DEFAULT, 
     worldPropertiesOptions);
@@ -678,7 +730,11 @@ extendControlPanel("World Properties", world.worldProperties, WORLD_PROPERTIES_D
     worldPropertiesOptions, controlPanel);
 
 const spaceBucketPropertiesOptions: ControlPanelOptions<SpaceBucketProperties> = {
-    bucketSize: {updateFunction: () => {world.resetSpaceBuckets()}},
+    bucketSize: {
+        updateFunction: () => {world.resetSpaceBuckets()},
+        inputChecker: stringNumChecker(true, 1),
+        errorMessage: "bucketSize must be a positive integer"
+    }
 };
 updatePropertiesFromCgi("sp", world.spaceBucketProperties, SPACE_BUCKET_PROPERTIES_DEFAULT, 
     spaceBucketPropertiesOptions);
