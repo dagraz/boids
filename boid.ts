@@ -351,7 +351,7 @@ class World {
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
-        this.context = canvas.getContext("2d", {alpha: false}) as CanvasRenderingContext2D;
+        this.context = canvas.getContext("2d") as CanvasRenderingContext2D;
         this.boidProperties = {...BOID_PROPERTIES_DEFAULT };
         this.derivedBoidProperties = {... DERIVED_BOID_PROPERTIES_DEFAULT};
         this.updateDerivedBoidProperties();
@@ -456,8 +456,6 @@ class World {
     }
 
     drawBoids() {
-        //this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        //this.context.fillStyle = "rgb(255 255 255 / 10%)";
         this.context.fillStyle = `rgb(from ${this.worldProperties.backgroundColor} r g b / ${this.worldProperties.backgroundOpacity})`;
         this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
         for (let boid of this.boids) {
