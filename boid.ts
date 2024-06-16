@@ -16,7 +16,7 @@
 
 // used for runtime property changes
 interface IndexableProperties {
-    [index:string]: number | boolean | string;
+    [index:string]: number | boolean | string | string[];
 }
 
 interface CohortProperties {
@@ -29,7 +29,7 @@ interface WorldProperties extends IndexableProperties {
     numBoids: number;
     continuousCohorts: boolean;
     homogenousCohorts: boolean;
-    cohortColors: string;
+    cohortColors: string[];
     gravity: number;
     width: number;
     height: number;
@@ -42,7 +42,7 @@ const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
     numBoids: 500,
     continuousCohorts: false,
     homogenousCohorts: true,
-    cohortColors: "red, blue",
+    cohortColors: ["red", "blue"],
     gravity: 0,
     width: -1,
     height: -1,
@@ -439,8 +439,8 @@ class World {
     }
 
     updateCohorts() {
-        this.colors = this.worldProperties.cohortColors.split(',')
-            .filter((value: string) => {return CSS.supports("color", value)});
+        this.colors = this.worldProperties.cohortColors.
+            filter((value: string) => {return CSS.supports("color", value)});
 
         for (const boid of this.boids) {
             const cohortProperties = boid.cohortProperties;
@@ -563,11 +563,18 @@ type ControlPanelOptions<Properties> = {
     [Key in keyof Properties]?: ControlPanelFieldOptions
 };
 
+function addInputNode(
+    parentNode: HTMLElement,
+    fieldOptions: ControlPanelFieldOptions,
+    value: boolean | number | string) {
+
+}
+
+
 
 function extendControlPanel<Properties extends IndexableProperties>(
     sectionTitle: string,
     properties: Properties, 
-    defaultProperties: Properties, 
     propertyOptions: ControlPanelOptions<Properties>,
     controlPanel: HTMLDivElement) {
 
@@ -576,6 +583,8 @@ function extendControlPanel<Properties extends IndexableProperties>(
     controlPanel.appendChild(controlPanelSection);
 
     for (const [kkey, value] of Object.entries(properties)) {
+        const key = kkey as keyof Properties;
+        
         const fieldOptions: ControlPanelFieldOptions = 
             propertyOptions[kkey] || {} as ControlPanelFieldOptions;
 
@@ -586,8 +595,12 @@ function extendControlPanel<Properties extends IndexableProperties>(
         const br = document.createElement('br');
         controlPanelSection.appendChild(br);
         
-        const key = kkey as keyof Properties;
+        const label = document.createElement('label');
+        label.innerHTML = key as string;
+        controlPanelSection.appendChild(label);
+
         const input = document.createElement('input') as HTMLInputElement;
+        label.appendChild(input);
         input.setAttribute('name', key as string);
         input.setAttribute('value', value.toString());
 
@@ -601,12 +614,6 @@ function extendControlPanel<Properties extends IndexableProperties>(
             input.toggleAttribute('checked', properties[key] as boolean);
         }
         
-        const label = document.createElement('label');
-        label.innerHTML = key as string;
-        label.appendChild(input);
-        
-        controlPanelSection.appendChild(label);
-
         input.addEventListener("change", () => {
             if (fieldOptions.inputChecker && !fieldOptions.inputChecker(input.value)) {
                 if (fieldOptions.errorMessage) {
@@ -671,6 +678,13 @@ function updatePropertiesFromCgi<Properties extends IndexableProperties>(
             }
         } else if (typeof properties[key] === "string") {
             properties[key] = cgiValue as Properties[typeof key];
+        } else if (properties[key] instanceof Array) {
+            // if we're pointing to the default array value, reset to a new empty array
+            if (properties[key] === defaultProperties[key]) {
+                // quietly amazed that this works.
+                (properties[key] as string[]) = [];
+            }
+            (properties[key] as string[]).push(cgiValue);
         }
 
         if (fieldOptions.updateFunction !== undefined) {
@@ -714,7 +728,9 @@ const worldPropertiesOptions: ControlPanelOptions<WorldProperties> = {
         errorMessage: "numBoids must be a non-negative integer"
     },
     continuousCohorts: {updateFunction: () => {world.updateCohorts();}},
-    cohortColors: {updateFunction: () => {world.updateCohorts();}},
+    cohortColors: {
+        inputChecker: (value: string) => { return CSS.supports("color", value)},
+        updateFunction: () => {world.updateCohorts();}},
     backgroundColor: {
         inputTypeOverride: "color",
         inputChecker: (value: string) => { return CSS.supports("color", value)},
@@ -726,7 +742,7 @@ const worldPropertiesOptions: ControlPanelOptions<WorldProperties> = {
 };
 updatePropertiesFromCgi("wp", world.worldProperties, WORLD_PROPERTIES_DEFAULT, 
     worldPropertiesOptions);
-extendControlPanel("World Properties", world.worldProperties, WORLD_PROPERTIES_DEFAULT, 
+extendControlPanel("World Properties", world.worldProperties,
     worldPropertiesOptions, controlPanel);
 
 const spaceBucketPropertiesOptions: ControlPanelOptions<SpaceBucketProperties> = {
@@ -738,7 +754,7 @@ const spaceBucketPropertiesOptions: ControlPanelOptions<SpaceBucketProperties> =
 };
 updatePropertiesFromCgi("sp", world.spaceBucketProperties, SPACE_BUCKET_PROPERTIES_DEFAULT, 
     spaceBucketPropertiesOptions);
-extendControlPanel("Space Bucket Properties", world.spaceBucketProperties, SPACE_BUCKET_PROPERTIES_DEFAULT, 
+extendControlPanel("Space Bucket Properties", world.spaceBucketProperties,
     spaceBucketPropertiesOptions, controlPanel);
 
 const boidPropertiesOptions: ControlPanelOptions<BoidProperties> = {
@@ -746,7 +762,7 @@ const boidPropertiesOptions: ControlPanelOptions<BoidProperties> = {
     maxAcceleration: {updateFunction: () => {world.updateDerivedBoidProperties()}},
 };
 updatePropertiesFromCgi("bp", world.boidProperties, BOID_PROPERTIES_DEFAULT, boidPropertiesOptions);
-extendControlPanel("Boid Properties", world.boidProperties, BOID_PROPERTIES_DEFAULT, boidPropertiesOptions, controlPanel);
+extendControlPanel("Boid Properties", world.boidProperties, boidPropertiesOptions, controlPanel);
 
 function setCgiParams<Properties extends IndexableProperties>(
     prefix: string, 
