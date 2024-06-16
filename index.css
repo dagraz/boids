@@ -14,5 +14,7 @@
 }
 
 #gottenUrl {
+    inline-size: min-content;
     text-wrap: wrap;
+    overflow-wrap: break-all;
 }
