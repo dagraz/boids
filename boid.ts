@@ -42,7 +42,7 @@ const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
     numBoids: 500,
     continuousCohorts: false,
     homogenousCohorts: true,
-    cohortColors: ["red", "blue"],
+    cohortColors: ["#ff0000", "#0000ff"],
     gravity: 0,
     width: -1,
     height: -1,
@@ -359,6 +359,7 @@ class World {
         this.spaceBucketProperties = SPACE_BUCKET_PROPERTIES_DEFAULT;
 
         this.worldProperties = {...WORLD_PROPERTIES_DEFAULT};
+        this.worldProperties.cohortColors = WORLD_PROPERTIES_DEFAULT.cohortColors.slice();
         this.worldProperties.width = canvas.width;
         this.worldProperties.height = canvas.height;
 
@@ -450,18 +451,13 @@ class World {
             } else {
                 const cohort = Math.floor(this.colors.length * cohortProperties.cohortSeed);
                 cohortProperties.cohort = cohort;
-                cohortProperties.color = this.colors[cohort];
+                cohortProperties.color = this.colors.length === 0 ? "black" : this.colors[cohort];
             }
         }
     }
 
     drawBoids() {
-
-
-
         this.context.fillStyle = `rgb(from ${this.worldProperties.backgroundColor} r g b / ${this.worldProperties.backgroundOpacity}%)`;
-
-
         this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
         for (let boid of this.boids) {
             boid.draw(this.context);
@@ -553,7 +549,7 @@ canvas.addEventListener("click", (e) => {
     }
 });
   
-
+// TODO: Make fields required, provide meaningful defaults, use the partial/spread pattern, clean up is-it-there checks in code
 interface ControlPanelFieldOptions {
     skip?: boolean;
     updateFunction?: () => void;
@@ -566,11 +562,48 @@ type ControlPanelOptions<Properties> = {
     [Key in keyof Properties]?: ControlPanelFieldOptions
 };
 
-function addInputNode(
-    parentNode: HTMLElement,
+function makePrimitiveInputNode(
+    name: string,
+    value: string | number | boolean,
     fieldOptions: ControlPanelFieldOptions,
-    value: boolean | number | string) {
+    setValue: () => void,
+) {
+    const input = document.createElement('input') as HTMLInputElement;
+    input.setAttribute('name', name as string);
+    input.setAttribute('value', value.toString());
 
+    if (fieldOptions.inputTypeOverride !== undefined) {
+        input.setAttribute('type', fieldOptions.inputTypeOverride);
+    } else if (typeof value === "number") {
+        input.setAttribute('type', 'number');
+    } else if (typeof value === "boolean") {
+        input.setAttribute('type', 'checkbox');
+        input.toggleAttribute('checked', value as boolean);
+    } else if (typeof value === "string") {
+        // do nothing, use default input type.
+    } else {
+        let unsupportedInputValue: never = value;
+    }
+
+    input.addEventListener("change", () => {
+        if (fieldOptions.inputChecker && !fieldOptions.inputChecker(input.value)) {
+            if (fieldOptions.errorMessage) {
+                input.setCustomValidity(fieldOptions.errorMessage);
+            } else {
+                input.setCustomValidity("invalid input");
+            }
+            input.reportValidity();
+        } else {
+            input.setCustomValidity("")
+            setValue();
+
+            if (fieldOptions.updateFunction !== undefined) {
+                fieldOptions.updateFunction();
+            }
+        }
+    });
+
+    return input;
 }
 
 
@@ -584,6 +617,7 @@ function extendControlPanel<Properties extends IndexableProperties>(
     const controlPanelSection = document.createElement('p');
     controlPanelSection.innerHTML = sectionTitle;
     controlPanel.appendChild(controlPanelSection);
+    controlPanelSection.appendChild(document.createElement('br'));
 
     for (const [kkey, value] of Object.entries(properties)) {
         const key = kkey as keyof Properties;
@@ -595,52 +629,87 @@ function extendControlPanel<Properties extends IndexableProperties>(
             continue;
         }
 
-        const br = document.createElement('br');
-        controlPanelSection.appendChild(br);
+        if (typeof value === "number" ||
+            typeof value === "boolean" ||
+            typeof value === "string") {
+
+            const label = document.createElement('label');
+            label.innerHTML = kkey;
+            controlPanelSection.appendChild(label);
         
-        const label = document.createElement('label');
-        label.innerHTML = key as string;
-        controlPanelSection.appendChild(label);
+            const input = makePrimitiveInputNode(kkey, value, fieldOptions,
+                () => {
+                    if (typeof properties[key] === "number") {
+                        properties[key] = parseFloat(input.value) as Properties[typeof key];
+                    } else if (typeof properties[key] === "boolean") {
+                        properties[key] = input.checked as Properties[typeof key];
+                    } else if (typeof properties[key] === "string") {
+                        properties[key] = input.value as Properties[typeof key];
+                    }
+                });
 
-        const input = document.createElement('input') as HTMLInputElement;
-        label.appendChild(input);
-        input.setAttribute('name', key as string);
-        input.setAttribute('value', value.toString());
+            label.appendChild(input);
+            controlPanelSection.appendChild(document.createElement('br'));
+        } else {
+            // value: string[]
+            // TODO: move this to a separate function, which will lock down value: string[],
+            // which should then allow some code simplification as we don't need to worry about
+            // narrowing edge cases.
 
+            const div = document.createElement('div') as HTMLDivElement;
+            div.innerHTML = key as string; 
+            controlPanelSection.appendChild(div);
 
-        if (fieldOptions.inputTypeOverride !== undefined) {
-            input.setAttribute('type', fieldOptions.inputTypeOverride);
-        } else if (typeof properties[key] === "number") {
-            input.setAttribute('type', 'number');
-        } else if (typeof properties[key] === "boolean") {
-            input.setAttribute('type', 'checkbox');
-            input.toggleAttribute('checked', properties[key] as boolean);
-        }
-        
-        input.addEventListener("change", () => {
-            if (fieldOptions.inputChecker && !fieldOptions.inputChecker(input.value)) {
-                if (fieldOptions.errorMessage) {
-                    input.setCustomValidity(fieldOptions.errorMessage);
-                } else {
-                    input.setCustomValidity("invalid input");
-                }
-                input.reportValidity();
-            } else {
-                input.setCustomValidity("")
+            function addField(i: number, a: string[]) {
+                // using value[i] makes type inference unhappy.
+                // something about specifying a local function borks narrowing.
 
-                if (typeof properties[key] === "number") {
-                    properties[key] = parseFloat(input.value) as Properties[typeof key];
-                } else if (typeof properties[key] === "boolean") {
-                    properties[key] = input.checked as Properties[typeof key];
-                } else if (typeof properties[key] === "string") {
-                    properties[key] = input.value as Properties[typeof key];
-                }
+                const label = document.createElement('label');
+                label.innerHTML = kkey;
+                div.appendChild(label);
+                const br = document.createElement('br');
 
+                const input = makePrimitiveInputNode(kkey, a[i], fieldOptions,
+                    () => {
+                        a[i] = input.value;
+                    });
+                label.appendChild(input);
+
+                const removeButton = document.createElement('input') as HTMLInputElement;
+                removeButton.setAttribute('type', 'button');
+                removeButton.setAttribute('value', 'x');
+                removeButton.addEventListener('click', () => {
+                    (value as string[])[i] = "";
+                    br.remove();
+                    label.remove();
+                    input.remove();
+                    removeButton.remove();
+                    if (fieldOptions.updateFunction !== undefined) {
+                        fieldOptions.updateFunction();
+                    }
+                });
+                div.appendChild(removeButton);
+                div.appendChild(br);
+            }
+
+            const addButton = document.createElement('input') as HTMLInputElement;
+            addButton.setAttribute('type', 'button');
+            addButton.setAttribute('value', '+');
+            addButton.addEventListener('click', () => {
+                // TODO: need a generic array element default-value specification
+                value.push("#000000");
+                addField(value.length - 1, value);
                 if (fieldOptions.updateFunction !== undefined) {
                     fieldOptions.updateFunction();
                 }
+            });
+            div.appendChild(addButton);
+            div.appendChild(document.createElement('br'));
+            
+            for(let i = 0; i < value.length; i++) {
+                addField(i, value);
             }
-        });
+        }
     }
 }
 
@@ -649,6 +718,8 @@ function updatePropertiesFromCgi<Properties extends IndexableProperties>(
     properties: Properties, 
     defaultProperties: Properties, 
     propertyOptions: ControlPanelOptions<Properties>) {
+
+    const arrayReset = new Set<string>();
 
     const params = new URLSearchParams(document.location.search);
     for (const [cgiKey, cgiValue] of params.entries()) {
@@ -682,10 +753,12 @@ function updatePropertiesFromCgi<Properties extends IndexableProperties>(
         } else if (typeof properties[key] === "string") {
             properties[key] = cgiValue as Properties[typeof key];
         } else if (properties[key] instanceof Array) {
-            // if we're pointing to the default array value, reset to a new empty array
-            if (properties[key] === defaultProperties[key]) {
+            // If this is the first item we're seeing from an array, 
+            // reset the array to clear out the default values.
+            if (!arrayReset.has(key as string)) {
                 // quietly amazed that this works.
                 (properties[key] as string[]) = [];
+                arrayReset.add(key as string);
             }
             (properties[key] as string[]).push(cgiValue);
         }
@@ -732,6 +805,7 @@ const worldPropertiesOptions: ControlPanelOptions<WorldProperties> = {
     },
     continuousCohorts: {updateFunction: () => {world.updateCohorts();}},
     cohortColors: {
+        inputTypeOverride: "color",
         inputChecker: (value: string) => { return CSS.supports("color", value)},
         updateFunction: () => {world.updateCohorts();}},
     backgroundColor: {
@@ -767,6 +841,7 @@ const boidPropertiesOptions: ControlPanelOptions<BoidProperties> = {
 updatePropertiesFromCgi("bp", world.boidProperties, BOID_PROPERTIES_DEFAULT, boidPropertiesOptions);
 extendControlPanel("Boid Properties", world.boidProperties, boidPropertiesOptions, controlPanel);
 
+
 function setCgiParams<Properties extends IndexableProperties>(
     prefix: string, 
     properties: Properties,
@@ -775,20 +850,32 @@ function setCgiParams<Properties extends IndexableProperties>(
     searchParams: URLSearchParams)
 {
     for(const [key, value] of Object.entries(properties)) {
-        const paramOptions = propertyOptions[key];
-        if (paramOptions && paramOptions.skip) {
+        const fieldOptions = propertyOptions[key] || {} as ControlPanelFieldOptions;
+        if (fieldOptions.skip) {
             continue;
         }
 
-        if (value != defaultProperties[key]) {
-            searchParams.set(prefix + '.' + key, `${value}`);
+        if (typeof value === "number" ||
+            typeof value === "boolean" ||
+            typeof value === "string") {
+            if (value != defaultProperties[key]) {
+                searchParams.set(prefix + '.' + key, `${value}`);
+            } 
+        } else {
+            // value: string[]
+            if (value.toString() !== defaultProperties[key].toString()) {
+                for(const v of value) {
+                    if (!fieldOptions.inputChecker || fieldOptions.inputChecker(v)) {
+                        searchParams.append(prefix + '.' + key, `${v}`);
+                    }
+                }
+            }
         }
     }
-
 }
 
 function getUrl() {
-    const url = new URL(window.location.href);
+    const url = new URL(window.location.href.split('?')[0]);
     const searchParams = url.searchParams;
     
     setCgiParams("wp", world.worldProperties, WORLD_PROPERTIES_DEFAULT, worldPropertiesOptions, searchParams);
