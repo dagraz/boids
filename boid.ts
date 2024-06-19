@@ -611,6 +611,59 @@ function makePrimitiveInputNode(
     return input;
 }
 
+function makeStringArrayInputNodes(
+    arrayName: string,
+    value: string[],
+    fieldOptions: ControlPanelFieldOptions,
+    controlPanelSection: HTMLElement,
+) {
+    const div = document.createElement('div') as HTMLDivElement;
+    div.innerHTML = arrayName as string; 
+    controlPanelSection.appendChild(div);
+
+    function addField(i: number) {
+        const label = document.createElement('label');
+        label.innerHTML = arrayName;
+        div.appendChild(label);
+        const br = document.createElement('br');
+
+        const input = makePrimitiveInputNode(arrayName, value[i], fieldOptions,
+            () => {
+                value[i] = input.value;
+            });
+        label.appendChild(input);
+
+        const removeButton = document.createElement('input') as HTMLInputElement;
+        removeButton.setAttribute('type', 'button');
+        removeButton.setAttribute('value', 'x');
+        removeButton.addEventListener('click', () => {
+            value[i] = "";
+            br.remove();
+            label.remove();
+            input.remove();
+            removeButton.remove();
+            fieldOptions.updateFunction();
+        });
+        div.appendChild(removeButton);
+        div.appendChild(br);
+    }
+
+    const addButton = document.createElement('input') as HTMLInputElement;
+    addButton.setAttribute('type', 'button');
+    addButton.setAttribute('value', '+');
+    addButton.addEventListener('click', () => {
+        // TODO: need a generic array element default-value specification
+        value.push("#000000");
+        addField(value.length - 1);
+        fieldOptions.updateFunction();
+    });
+    div.appendChild(addButton);
+    div.appendChild(document.createElement('br'));
+    
+    for(let i = 0; i < value.length; i++) {
+        addField(i);
+    }
+}
 
 
 function extendControlPanel<Properties extends IndexableProperties>(
@@ -660,59 +713,7 @@ function extendControlPanel<Properties extends IndexableProperties>(
             controlPanelSection.appendChild(document.createElement('br'));
         } else {
             // value: string[]
-            // TODO: move this to a separate function, which will lock down value: string[],
-            // which should then allow some code simplification as we don't need to worry about
-            // narrowing edge cases.
-
-            const div = document.createElement('div') as HTMLDivElement;
-            div.innerHTML = key as string; 
-            controlPanelSection.appendChild(div);
-
-            function addField(i: number, a: string[]) {
-                // using value[i] makes type inference unhappy.
-                // something about specifying a local function borks narrowing.
-
-                const label = document.createElement('label');
-                label.innerHTML = kkey;
-                div.appendChild(label);
-                const br = document.createElement('br');
-
-                const input = makePrimitiveInputNode(kkey, a[i], fieldOptions,
-                    () => {
-                        a[i] = input.value;
-                    });
-                label.appendChild(input);
-
-                const removeButton = document.createElement('input') as HTMLInputElement;
-                removeButton.setAttribute('type', 'button');
-                removeButton.setAttribute('value', 'x');
-                removeButton.addEventListener('click', () => {
-                    (value as string[])[i] = "";
-                    br.remove();
-                    label.remove();
-                    input.remove();
-                    removeButton.remove();
-                    fieldOptions.updateFunction();
-                });
-                div.appendChild(removeButton);
-                div.appendChild(br);
-            }
-
-            const addButton = document.createElement('input') as HTMLInputElement;
-            addButton.setAttribute('type', 'button');
-            addButton.setAttribute('value', '+');
-            addButton.addEventListener('click', () => {
-                // TODO: need a generic array element default-value specification
-                value.push("#000000");
-                addField(value.length - 1, value);
-                fieldOptions.updateFunction();
-            });
-            div.appendChild(addButton);
-            div.appendChild(document.createElement('br'));
-            
-            for(let i = 0; i < value.length; i++) {
-                addField(i, value);
-            }
+            makeStringArrayInputNodes(kkey, value, fieldOptions, controlPanelSection);
         }
     }
 }
