@@ -549,17 +549,25 @@ canvas.addEventListener("click", (e) => {
     }
 });
   
-// TODO: Make fields required, provide meaningful defaults, use the partial/spread pattern, clean up is-it-there checks in code
+
 interface ControlPanelFieldOptions {
-    skip?: boolean;
-    updateFunction?: () => void;
-    inputChecker?: (value: string) => boolean;
-    errorMessage?: string;
-    inputTypeOverride?: string;
+    skip: boolean;
+    updateFunction: () => void;
+    isValid: (value: string) => boolean;
+    errorMessage: string;
+    inputTypeOverride: string;
 };
 
+const CONTROL_PANEL_FIELD_OPTIONS_DEFAULT: ControlPanelFieldOptions = {
+    skip: false,
+    updateFunction: () => {},
+    isValid: (string) => {return true},
+    errorMessage: "",
+    inputTypeOverride: "",
+}
+
 type ControlPanelOptions<Properties> = {
-    [Key in keyof Properties]?: ControlPanelFieldOptions
+    [Key in keyof Properties]?: Partial<ControlPanelFieldOptions>
 };
 
 function makePrimitiveInputNode(
@@ -572,7 +580,7 @@ function makePrimitiveInputNode(
     input.setAttribute('name', name as string);
     input.setAttribute('value', value.toString());
 
-    if (fieldOptions.inputTypeOverride !== undefined) {
+    if (fieldOptions.inputTypeOverride) {
         input.setAttribute('type', fieldOptions.inputTypeOverride);
     } else if (typeof value === "number") {
         input.setAttribute('type', 'number');
@@ -586,7 +594,7 @@ function makePrimitiveInputNode(
     }
 
     input.addEventListener("change", () => {
-        if (fieldOptions.inputChecker && !fieldOptions.inputChecker(input.value)) {
+        if (!fieldOptions.isValid(input.value)) {
             if (fieldOptions.errorMessage) {
                 input.setCustomValidity(fieldOptions.errorMessage);
             } else {
@@ -596,10 +604,7 @@ function makePrimitiveInputNode(
         } else {
             input.setCustomValidity("")
             setValue();
-
-            if (fieldOptions.updateFunction !== undefined) {
-                fieldOptions.updateFunction();
-            }
+            fieldOptions.updateFunction();
         }
     });
 
@@ -622,8 +627,11 @@ function extendControlPanel<Properties extends IndexableProperties>(
     for (const [kkey, value] of Object.entries(properties)) {
         const key = kkey as keyof Properties;
         
-        const fieldOptions: ControlPanelFieldOptions = 
-            propertyOptions[kkey] || {} as ControlPanelFieldOptions;
+        const fieldOptions: ControlPanelFieldOptions = {
+            ...CONTROL_PANEL_FIELD_OPTIONS_DEFAULT,
+            ...propertyOptions[kkey]
+        };
+            
 
         if (fieldOptions.skip) {
             continue;
@@ -684,9 +692,7 @@ function extendControlPanel<Properties extends IndexableProperties>(
                     label.remove();
                     input.remove();
                     removeButton.remove();
-                    if (fieldOptions.updateFunction !== undefined) {
-                        fieldOptions.updateFunction();
-                    }
+                    fieldOptions.updateFunction();
                 });
                 div.appendChild(removeButton);
                 div.appendChild(br);
@@ -699,9 +705,7 @@ function extendControlPanel<Properties extends IndexableProperties>(
                 // TODO: need a generic array element default-value specification
                 value.push("#000000");
                 addField(value.length - 1, value);
-                if (fieldOptions.updateFunction !== undefined) {
-                    fieldOptions.updateFunction();
-                }
+                fieldOptions.updateFunction();
             });
             div.appendChild(addButton);
             div.appendChild(document.createElement('br'));
@@ -733,12 +737,16 @@ function updatePropertiesFromCgi<Properties extends IndexableProperties>(
             continue;
         }
 
-        const fieldOptions = propertyOptions[key] || {} as ControlPanelFieldOptions;
+        const fieldOptions: ControlPanelFieldOptions = {
+            ...CONTROL_PANEL_FIELD_OPTIONS_DEFAULT,
+            ...propertyOptions[key]
+        };
+
         if (fieldOptions.skip) {
             continue;
         }
 
-        if (fieldOptions.inputChecker && !fieldOptions.inputChecker(cgiValue)) {
+        if (!fieldOptions.isValid(cgiValue)) {
             continue;
         }
 
@@ -763,9 +771,7 @@ function updatePropertiesFromCgi<Properties extends IndexableProperties>(
             (properties[key] as string[]).push(cgiValue);
         }
 
-        if (fieldOptions.updateFunction !== undefined) {
-            fieldOptions.updateFunction();
-        }
+        fieldOptions.updateFunction();
     }
  }
 
@@ -800,20 +806,20 @@ const worldPropertiesOptions: ControlPanelOptions<WorldProperties> = {
     height: {skip: true},
     numBoids: {
         updateFunction: () => {world.updateNumBoids();},
-        inputChecker: stringNumChecker(true, 0),
+        isValid: stringNumChecker(true, 0),
         errorMessage: "numBoids must be a non-negative integer"
     },
     continuousCohorts: {updateFunction: () => {world.updateCohorts();}},
     cohortColors: {
         inputTypeOverride: "color",
-        inputChecker: (value: string) => { return CSS.supports("color", value)},
+        isValid: (value: string) => { return CSS.supports("color", value)},
         updateFunction: () => {world.updateCohorts();}},
     backgroundColor: {
         inputTypeOverride: "color",
-        inputChecker: (value: string) => { return CSS.supports("color", value)},
+        isValid: (value: string) => { return CSS.supports("color", value)},
     },
     backgroundOpacity: {
-        inputChecker: stringNumChecker(true, 0, 100),
+        isValid: stringNumChecker(true, 0, 100),
         errorMessage: "backgroundOpacity must be an integer in the range of [0-100]"
     }
 };
@@ -825,7 +831,7 @@ extendControlPanel("World Properties", world.worldProperties,
 const spaceBucketPropertiesOptions: ControlPanelOptions<SpaceBucketProperties> = {
     bucketSize: {
         updateFunction: () => {world.resetSpaceBuckets()},
-        inputChecker: stringNumChecker(true, 1),
+        isValid: stringNumChecker(true, 1),
         errorMessage: "bucketSize must be a positive integer"
     }
 };
@@ -850,7 +856,11 @@ function setCgiParams<Properties extends IndexableProperties>(
     searchParams: URLSearchParams)
 {
     for(const [key, value] of Object.entries(properties)) {
-        const fieldOptions = propertyOptions[key] || {} as ControlPanelFieldOptions;
+        const fieldOptions: ControlPanelFieldOptions = {
+            ...CONTROL_PANEL_FIELD_OPTIONS_DEFAULT,
+            ...propertyOptions[key]
+        };
+
         if (fieldOptions.skip) {
             continue;
         }
@@ -865,7 +875,7 @@ function setCgiParams<Properties extends IndexableProperties>(
             // value: string[]
             if (value.toString() !== defaultProperties[key].toString()) {
                 for(const v of value) {
-                    if (!fieldOptions.inputChecker || fieldOptions.inputChecker(v)) {
+                    if (fieldOptions.isValid(v)) {
                         searchParams.append(prefix + '.' + key, `${v}`);
                     }
                 }
