@@ -654,7 +654,6 @@ function makeStringArrayInputNodes(
     addButton.setAttribute('type', 'button');
     addButton.setAttribute('value', '+');
     addButton.addEventListener('click', () => {
-        // TODO: need a generic array element default-value specification
         value.push(fieldOptions.defaultArrayValue);
         addField(value.length - 1);
         fieldOptions.updateFunction();
