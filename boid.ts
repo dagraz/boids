@@ -121,9 +121,8 @@ function boidDistance(boidA: Boid, boidB: Boid): number {
 
 class Boid {
     constructor(public x: number, public y: number, public speed: number, direction: number, 
-        boidProperties: BoidProperties, derivedBoidProperties: DerivedBoidProperties,
-        worldProperties: WorldProperties, cohortProperties: CohortProperties) {
-        
+            boidProperties: BoidProperties, derivedBoidProperties: DerivedBoidProperties,
+            worldProperties: WorldProperties, cohortProperties: CohortProperties) {
         this.vx = speed * Math.cos(direction);
         this.vy = speed * Math.sin(direction);
         this.deltaVx = 0;
@@ -573,11 +572,10 @@ type ControlPanelOptions<Properties> = {
 };
 
 function makePrimitiveInputNode(
-    name: string,
-    value: string | number | boolean,
-    fieldOptions: ControlPanelFieldOptions,
-    setValue: () => void,
-) {
+        name: string,
+        value: string | number | boolean,
+        fieldOptions: ControlPanelFieldOptions,
+        setValue: () => void) {
     const input = document.createElement('input') as HTMLInputElement;
     input.setAttribute('name', name as string);
     input.setAttribute('value', value.toString());
@@ -614,11 +612,10 @@ function makePrimitiveInputNode(
 }
 
 function makeStringArrayInputNodes(
-    arrayName: string,
-    value: string[],
-    fieldOptions: ControlPanelFieldOptions,
-    controlPanelSection: HTMLElement,
-) {
+        arrayName: string,
+        value: string[],
+        fieldOptions: ControlPanelFieldOptions,
+        controlPanelSection: HTMLElement) {
     const div = document.createElement('div') as HTMLDivElement;
     div.innerHTML = arrayName as string; 
     controlPanelSection.appendChild(div);
@@ -668,11 +665,10 @@ function makeStringArrayInputNodes(
 
 
 function extendControlPanel<Properties extends IndexableProperties>(
-    sectionTitle: string,
-    properties: Properties, 
-    propertyOptions: ControlPanelOptions<Properties>,
-    controlPanel: HTMLDivElement) {
-
+        sectionTitle: string,
+        properties: Properties, 
+        propertyOptions: ControlPanelOptions<Properties>,
+        controlPanel: HTMLDivElement) {
     const controlPanelSection = document.createElement('p');
     controlPanelSection.innerHTML = sectionTitle;
     controlPanel.appendChild(controlPanelSection);
@@ -720,11 +716,10 @@ function extendControlPanel<Properties extends IndexableProperties>(
 }
 
 function updatePropertiesFromCgi<Properties extends IndexableProperties>(
-    keyPrefix: string,
-    properties: Properties, 
-    defaultProperties: Properties, 
-    propertyOptions: ControlPanelOptions<Properties>) {
-
+        keyPrefix: string,
+        properties: Properties, 
+        defaultProperties: Properties, 
+        propertyOptions: ControlPanelOptions<Properties>) {
     const arrayReset = new Set<string>();
 
     const params = new URLSearchParams(document.location.search);
@@ -853,12 +848,11 @@ extendControlPanel("Boid Properties", world.boidProperties, boidPropertiesOption
 
 
 function setCgiParams<Properties extends IndexableProperties>(
-    prefix: string, 
-    properties: Properties,
-    defaultProperties: Properties,
-    propertyOptions: ControlPanelOptions<Properties>,
-    searchParams: URLSearchParams)
-{
+        prefix: string, 
+        properties: Properties,
+        defaultProperties: Properties,
+        propertyOptions: ControlPanelOptions<Properties>,
+        searchParams: URLSearchParams) {
     for(const [key, value] of Object.entries(properties)) {
         const fieldOptions: ControlPanelFieldOptions = {
             ...CONTROL_PANEL_FIELD_OPTIONS_DEFAULT,
