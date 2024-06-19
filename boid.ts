@@ -343,7 +343,9 @@ class World {
     colors: string[];
 
     mousePosition: {x: number, y: number} | null;
-
+    running: boolean = true;
+    reqAnimationFrameReturn: number = 0;
+    
     spaceBuckets: Boid[][][];
 
     constructor(canvas: HTMLCanvasElement) {
@@ -368,8 +370,35 @@ class World {
         this.colors = [];
         this.boids = []
         this.updateNumBoids();
+
+        this.setupMouse();
     }
 
+    setupMouse() {
+        this.canvas.addEventListener("mousemove", (e) => {
+            if (world.mousePosition === null) {
+                world.mousePosition = {x: 0, y: 0};
+            }
+            world.mousePosition.x = e.clientX;
+            world.mousePosition.y = e.clientY;
+          });
+        
+        this.canvas.addEventListener("mouseout", (e) => {
+            world.mousePosition = null;
+          });
+        
+        
+        this.canvas.addEventListener("click", (e) => {
+            if (this.running) {
+                window.cancelAnimationFrame(this.reqAnimationFrameReturn);
+                this.running = false;
+            } else {
+                this.reqAnimationFrameReturn = window.requestAnimationFrame(cycle);
+                this.running = true;
+            }
+        });
+        
+    }
     xToBucket(x: number): number {
         const cleanX = Math.min(this.worldProperties.width, Math.max(0, x));
         return Math.floor(cleanX / this.spaceBucketProperties.bucketSize);
@@ -516,32 +545,6 @@ canvas.height = canvas.clientHeight;
 
 
 const world = new World(canvas);
-
-canvas.addEventListener("mousemove", (e) => {
-    if (world.mousePosition === null) {
-        world.mousePosition = {x: 0, y: 0};
-    }
-    world.mousePosition.x = e.clientX;
-    world.mousePosition.y = e.clientY;
-  });
-
-canvas.addEventListener("mouseout", (e) => {
-    world.mousePosition = null;
-  });
-
-let running: boolean = true;
-let raf: number;
-
-canvas.addEventListener("click", (e) => {
-    if (running) {
-        window.cancelAnimationFrame(raf);
-        running = false;
-    } else {
-        raf = window.requestAnimationFrame(cycle);
-        running = true;
-    }
-});
-  
 
 interface ControlPanelFieldOptions {
     skip: boolean;
@@ -897,7 +900,7 @@ function cycle() {
     world.moveBoids();
     world.drawBoids();
     
-    raf = window.requestAnimationFrame(cycle)
+    world.reqAnimationFrameReturn = window.requestAnimationFrame(cycle)
 }
         
 cycle();
