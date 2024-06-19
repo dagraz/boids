@@ -556,6 +556,7 @@ interface ControlPanelFieldOptions {
     isValid: (value: string) => boolean;
     errorMessage: string;
     inputTypeOverride: string;
+    defaultArrayValue: string;
 };
 
 const CONTROL_PANEL_FIELD_OPTIONS_DEFAULT: ControlPanelFieldOptions = {
@@ -564,6 +565,7 @@ const CONTROL_PANEL_FIELD_OPTIONS_DEFAULT: ControlPanelFieldOptions = {
     isValid: (string) => {return true},
     errorMessage: "",
     inputTypeOverride: "",
+    defaultArrayValue: ""
 }
 
 type ControlPanelOptions<Properties> = {
@@ -653,7 +655,7 @@ function makeStringArrayInputNodes(
     addButton.setAttribute('value', '+');
     addButton.addEventListener('click', () => {
         // TODO: need a generic array element default-value specification
-        value.push("#000000");
+        value.push(fieldOptions.defaultArrayValue);
         addField(value.length - 1);
         fieldOptions.updateFunction();
     });
@@ -814,7 +816,9 @@ const worldPropertiesOptions: ControlPanelOptions<WorldProperties> = {
     cohortColors: {
         inputTypeOverride: "color",
         isValid: (value: string) => { return CSS.supports("color", value)},
-        updateFunction: () => {world.updateCohorts();}},
+        updateFunction: () => {world.updateCohorts();},
+        defaultArrayValue: "#000000",
+    },
     backgroundColor: {
         inputTypeOverride: "color",
         isValid: (value: string) => { return CSS.supports("color", value)},
