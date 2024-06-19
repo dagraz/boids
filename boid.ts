@@ -7,8 +7,6 @@
 //    * legibility
 //      * make control panel more legible
 //      * figure out how to make the generated URL wrap or be in a scrolling box or something
-//    * allow for per-field data validation and conversion (e.g. float vs int, positive values, valid colors, etc)
-//    * use color picker for user set colors
 //  * configuration / property management (on-page control-panel, cgi parsing, url generation) 
 //    feels like it could be cleaned up and wrapped into a separate library.
 //  * 3d!
@@ -425,10 +423,6 @@ class World {
                 this.worldProperties, cohortProperties);
 
             this.boids.push(boid);
-
-            const xBucket = this.xToBucket(boid.x);
-            const yBucket = this.yToBucket(boid.y);
-            this.spaceBuckets[xBucket][yBucket].push(boid);
         }
 
         if (this.boids.length > this.worldProperties.numBoids) {
