@@ -10,6 +10,7 @@
 //  * configuration / property management (on-page control-panel, cgi parsing, url generation) 
 //    feels like it could be cleaned up and wrapped into a separate library.
 //  * 3d!
+//  * made the animation cycle sensitive to passed time
 
 
 // used for runtime property changes
@@ -393,7 +394,7 @@ class World {
                 window.cancelAnimationFrame(this.reqAnimationFrameReturn);
                 this.running = false;
             } else {
-                this.reqAnimationFrameReturn = window.requestAnimationFrame(cycle);
+                this.reqAnimationFrameReturn = window.requestAnimationFrame(() => this.cycle());
                 this.running = true;
             }
         });
@@ -537,6 +538,15 @@ class World {
             boid.updateAcceleration(nearBoids, this.mousePosition);
         }
     }
+
+    cycle() {
+        world.updateBoids();
+        world.moveBoids();
+        world.drawBoids();
+        
+        world.reqAnimationFrameReturn = window.requestAnimationFrame(() => this.cycle())
+    }
+    
 }
 
 let canvas = document.getElementsByTagName("canvas")[0];
@@ -892,12 +902,5 @@ const getUrlButton = document.getElementById("getUrlButton") as HTMLElement;
 getUrlButton.addEventListener("click", getUrl);
 
 
-function cycle() {
-    world.updateBoids();
-    world.moveBoids();
-    world.drawBoids();
-    
-    world.reqAnimationFrameReturn = window.requestAnimationFrame(cycle)
-}
         
-cycle();
+world.cycle();
