@@ -715,7 +715,6 @@ function extendControlPanel<Properties extends IndexableProperties>(
 function updatePropertiesFromCgi<Properties extends IndexableProperties>(
         keyPrefix: string,
         properties: Properties, 
-        defaultProperties: Properties, 
         propertyOptions: ControlPanelOptions<Properties>) {
     const arrayReset = new Set<string>();
 
@@ -819,8 +818,7 @@ const worldPropertiesOptions: ControlPanelOptions<WorldProperties> = {
         errorMessage: "backgroundOpacity must be an integer in the range of [0-100]"
     }
 };
-updatePropertiesFromCgi("wp", world.worldProperties, WORLD_PROPERTIES_DEFAULT, 
-    worldPropertiesOptions);
+updatePropertiesFromCgi("wp", world.worldProperties, worldPropertiesOptions);
 extendControlPanel("World Properties", world.worldProperties,
     worldPropertiesOptions, controlPanel);
 
@@ -831,8 +829,7 @@ const spaceBucketPropertiesOptions: ControlPanelOptions<SpaceBucketProperties> =
         errorMessage: "bucketSize must be a positive integer"
     }
 };
-updatePropertiesFromCgi("sp", world.spaceBucketProperties, SPACE_BUCKET_PROPERTIES_DEFAULT, 
-    spaceBucketPropertiesOptions);
+updatePropertiesFromCgi("sp", world.spaceBucketProperties, spaceBucketPropertiesOptions);
 extendControlPanel("Space Bucket Properties", world.spaceBucketProperties,
     spaceBucketPropertiesOptions, controlPanel);
 
@@ -840,7 +837,7 @@ const boidPropertiesOptions: ControlPanelOptions<BoidProperties> = {
     awarenessRadius: {updateFunction: () => {world.updateDerivedBoidProperties()}},
     maxAcceleration: {updateFunction: () => {world.updateDerivedBoidProperties()}},
 };
-updatePropertiesFromCgi("bp", world.boidProperties, BOID_PROPERTIES_DEFAULT, boidPropertiesOptions);
+updatePropertiesFromCgi("bp", world.boidProperties, boidPropertiesOptions);
 extendControlPanel("Boid Properties", world.boidProperties, boidPropertiesOptions, controlPanel);
 
 
