@@ -1,15 +1,31 @@
 import * as boids from "./boid.js";
 
+// used for runtime property changes
+export interface IndexableProperties {
+    [index:string]: number | boolean | string | string[];
+}
+
 let canvas = document.getElementsByTagName("canvas")[0];
 canvas.width = canvas.clientWidth;
 canvas.height = canvas.clientHeight;    
 
+const worldProperties = Object.assign({} as IndexableProperties, boids.worldPropertiesDefault);
+worldProperties.cohortColors = boids.worldPropertiesDefault.cohortColors.slice();
+
+
+const worldPropertiesDefault = Object.assign({} as IndexableProperties, boids.worldPropertiesDefault);
+worldPropertiesDefault.cohortColors = boids.worldPropertiesDefault.cohortColors.slice();
+
+const boidProperties = Object.assign({} as IndexableProperties, boids.boidPropertiesDefault);
+const boidPropertiesDefault = Object.assign({} as IndexableProperties, boids.boidPropertiesDefault);
+const spaceBucketProperties = Object.assign({} as IndexableProperties, boids.spaceBucketPropertiesDefault);
+const spaceBucketPropertiesDefault = Object.assign({} as IndexableProperties, boids.spaceBucketPropertiesDefault);
 
 const world = new boids.World(
     canvas,
-    boids.worldPropertiesDefault,
-    boids.boidPropertiesDefault,
-    boids.spaceBucketPropertiesDefault);
+    worldProperties,
+    boidProperties,
+    spaceBucketProperties);
 
 export interface ControlPanelFieldOptions {
     skip: boolean;
@@ -126,7 +142,7 @@ function makeStringArrayInputNodes(
 }
 
 
-export function extendControlPanel<Properties extends boids.IndexableProperties>(
+export function extendControlPanel<Properties extends IndexableProperties>(
         sectionTitle: string,
         properties: Properties, 
         propertyOptions: ControlPanelOptions<Properties>,
@@ -177,7 +193,7 @@ export function extendControlPanel<Properties extends boids.IndexableProperties>
     }
 }
 
-function updatePropertiesFromCgi<Properties extends boids.IndexableProperties>(
+function updatePropertiesFromCgi<Properties extends IndexableProperties>(
         keyPrefix: string,
         properties: Properties, 
         propertyOptions: ControlPanelOptions<Properties>) {
@@ -283,8 +299,8 @@ const worldPropertiesOptions: ControlPanelOptions<boids.WorldProperties> = {
         errorMessage: "backgroundOpacity must be an integer in the range of [0-100]"
     }
 };
-updatePropertiesFromCgi("wp", world.worldProperties, worldPropertiesOptions);
-extendControlPanel("World Properties", world.worldProperties,
+updatePropertiesFromCgi("wp", worldProperties, worldPropertiesOptions);
+extendControlPanel("World Properties", worldProperties,
     worldPropertiesOptions, controlPanel);
 
 const spaceBucketPropertiesOptions: ControlPanelOptions<boids.SpaceBucketProperties> = {
@@ -294,19 +310,19 @@ const spaceBucketPropertiesOptions: ControlPanelOptions<boids.SpaceBucketPropert
         errorMessage: "bucketSize must be a positive integer"
     }
 };
-updatePropertiesFromCgi("sp", world.spaceBucketProperties, spaceBucketPropertiesOptions);
-extendControlPanel("Space Bucket Properties", world.spaceBucketProperties,
+updatePropertiesFromCgi("sp", spaceBucketProperties, spaceBucketPropertiesOptions);
+extendControlPanel("Space Bucket Properties", spaceBucketProperties,
     spaceBucketPropertiesOptions, controlPanel);
 
 const boidPropertiesOptions: ControlPanelOptions<boids.BoidProperties> = {
     awarenessRadius: {updateFunction: () => {world.updateDerivedBoidProperties()}},
     maxAcceleration: {updateFunction: () => {world.updateDerivedBoidProperties()}},
 };
-updatePropertiesFromCgi("bp", world.boidProperties, boidPropertiesOptions);
-extendControlPanel("Boid Properties", world.boidProperties, boidPropertiesOptions, controlPanel);
+updatePropertiesFromCgi("bp", boidProperties, boidPropertiesOptions);
+extendControlPanel("Boid Properties", boidProperties, boidPropertiesOptions, controlPanel);
 
 
-function setCgiParams<Properties extends boids.IndexableProperties>(
+function setCgiParams<Properties extends IndexableProperties>(
         prefix: string, 
         properties: Properties,
         defaultProperties: Properties,
@@ -345,9 +361,9 @@ function getUrl() {
     const url = new URL(window.location.href.split('?')[0]);
     const searchParams = url.searchParams;
     
-    setCgiParams("wp", world.worldProperties, boids.worldPropertiesDefault, worldPropertiesOptions, searchParams);
-    setCgiParams("sp", world.spaceBucketProperties, boids.spaceBucketPropertiesDefault, spaceBucketPropertiesOptions, searchParams);
-    setCgiParams("bp", world.boidProperties, boids.boidPropertiesDefault, boidPropertiesOptions, searchParams);
+    setCgiParams("wp", worldProperties, worldPropertiesDefault, worldPropertiesOptions, searchParams);
+    setCgiParams("sp", spaceBucketProperties, spaceBucketPropertiesDefault, spaceBucketPropertiesOptions, searchParams);
+    setCgiParams("bp", boidProperties, boidPropertiesDefault, boidPropertiesOptions, searchParams);
 
     const gottenUrl = document.getElementById("gottenUrl") as HTMLElement;
     gottenUrl.innerHTML = url.toString();

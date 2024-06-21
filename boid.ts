@@ -13,10 +13,6 @@
 //  * made the animation cycle sensitive to passed time
 
 
-// used for runtime property changes
-export interface IndexableProperties {
-    [index:string]: number | boolean | string | string[];
-}
 
 export interface CohortProperties {
     color: string;
@@ -24,7 +20,7 @@ export interface CohortProperties {
     cohortSeed: number;
 }
 
-export interface WorldProperties extends IndexableProperties {
+export interface WorldProperties {
     numBoids: number;
     continuousCohorts: boolean;
     homogenousCohorts: boolean;
@@ -51,7 +47,7 @@ export const worldPropertiesDefault: WorldProperties = {
 }
 
 
-export interface SpaceBucketProperties extends IndexableProperties {
+export interface SpaceBucketProperties {
     bucketSize: number;
 }
 
@@ -59,7 +55,7 @@ export const spaceBucketPropertiesDefault: SpaceBucketProperties = {
     bucketSize: 25,
 }
 
-export interface BoidProperties extends IndexableProperties {
+export interface BoidProperties {
     // Global parameters for boid behavior
     minSpeed: number;
     maxSpeed: number;
@@ -364,7 +360,6 @@ export class World {
         this.spaceBucketProperties = spaceBucketProperties;
 
         this.worldProperties = worldProperties;
-        // this.worldProperties.cohortColors = worldPropertiesDefault.cohortColors.slice();
         this.worldProperties.width = canvas.width;
         this.worldProperties.height = canvas.height;
 
