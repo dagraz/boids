@@ -14,17 +14,17 @@
 
 
 // used for runtime property changes
-interface IndexableProperties {
+export interface IndexableProperties {
     [index:string]: number | boolean | string | string[];
 }
 
-interface CohortProperties {
+export interface CohortProperties {
     color: string;
     cohort: number;
     cohortSeed: number;
 }
 
-interface WorldProperties extends IndexableProperties {
+export interface WorldProperties extends IndexableProperties {
     numBoids: number;
     continuousCohorts: boolean;
     homogenousCohorts: boolean;
@@ -37,7 +37,7 @@ interface WorldProperties extends IndexableProperties {
     backgroundOpacity: string;
 }
 
-const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
+export const worldPropertiesDefault: WorldProperties = {
     numBoids: 500,
     continuousCohorts: false,
     homogenousCohorts: true,
@@ -51,15 +51,15 @@ const WORLD_PROPERTIES_DEFAULT: WorldProperties = {
 }
 
 
-interface SpaceBucketProperties extends IndexableProperties {
+export interface SpaceBucketProperties extends IndexableProperties {
     bucketSize: number;
 }
 
-const SPACE_BUCKET_PROPERTIES_DEFAULT: SpaceBucketProperties = {
+export const spaceBucketPropertiesDefault: SpaceBucketProperties = {
     bucketSize: 25,
 }
 
-interface BoidProperties extends IndexableProperties {
+export interface BoidProperties extends IndexableProperties {
     // Global parameters for boid behavior
     minSpeed: number;
     maxSpeed: number;
@@ -82,7 +82,7 @@ interface BoidProperties extends IndexableProperties {
     inverseSquareAvoidance: boolean;
 };
 
-const BOID_PROPERTIES_DEFAULT: BoidProperties = {
+export const boidPropertiesDefault: BoidProperties = {
     minSpeed: 0.75,
     maxSpeed: 2,
     maxAcceleration: 0.2,
@@ -101,9 +101,10 @@ interface DerivedBoidProperties {
     awarenessRadiusSq: number;
 }
 
-const DERIVED_BOID_PROPERTIES_DEFAULT: DerivedBoidProperties = {
-    maxAccelerationSq: square(BOID_PROPERTIES_DEFAULT.maxAcceleration),
-    awarenessRadiusSq: square(BOID_PROPERTIES_DEFAULT.awarenessRadius),
+// TODO: this should be a shared function call
+const derivedBoidPropertiesDefault: DerivedBoidProperties = {
+    maxAccelerationSq: square(boidPropertiesDefault.maxAcceleration),
+    awarenessRadiusSq: square(boidPropertiesDefault.awarenessRadius),
 };
 
 function square(x: number): number {
@@ -118,7 +119,7 @@ function boidDistance(boidA: Boid, boidB: Boid): number {
     return Math.sqrt(boidDistanceSq(boidA, boidB));
 }
 
-class Boid {
+export class Boid {
     constructor(public x: number, public y: number, public speed: number, direction: number, 
             boidProperties: BoidProperties, derivedBoidProperties: DerivedBoidProperties,
             worldProperties: WorldProperties, cohortProperties: CohortProperties) {
@@ -332,7 +333,7 @@ class Boid {
 }
 
 
-class World {
+export class World {
     public canvas: HTMLCanvasElement;
     public context: CanvasRenderingContext2D;
     public boids: Boid[];
@@ -352,14 +353,14 @@ class World {
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
         this.context = canvas.getContext("2d") as CanvasRenderingContext2D;
-        this.boidProperties = {...BOID_PROPERTIES_DEFAULT };
-        this.derivedBoidProperties = {... DERIVED_BOID_PROPERTIES_DEFAULT};
+        this.boidProperties = {...boidPropertiesDefault };
+        this.derivedBoidProperties = {... derivedBoidPropertiesDefault};
         this.updateDerivedBoidProperties();
 
-        this.spaceBucketProperties = SPACE_BUCKET_PROPERTIES_DEFAULT;
+        this.spaceBucketProperties = spaceBucketPropertiesDefault;
 
-        this.worldProperties = {...WORLD_PROPERTIES_DEFAULT};
-        this.worldProperties.cohortColors = WORLD_PROPERTIES_DEFAULT.cohortColors.slice();
+        this.worldProperties = {...worldPropertiesDefault};
+        this.worldProperties.cohortColors = worldPropertiesDefault.cohortColors.slice();
         this.worldProperties.width = canvas.width;
         this.worldProperties.height = canvas.height;
 
@@ -377,15 +378,15 @@ class World {
 
     setupMouse() {
         this.canvas.addEventListener("mousemove", (e) => {
-            if (world.mousePosition === null) {
-                world.mousePosition = {x: 0, y: 0};
+            if (this.mousePosition === null) {
+                this.mousePosition = {x: 0, y: 0};
             }
-            world.mousePosition.x = e.clientX;
-            world.mousePosition.y = e.clientY;
+            this.mousePosition.x = e.clientX;
+            this.mousePosition.y = e.clientY;
           });
         
         this.canvas.addEventListener("mouseout", (e) => {
-            world.mousePosition = null;
+            this.mousePosition = null;
           });
         
         
@@ -416,8 +417,8 @@ class World {
     }
 
     resetSpaceBuckets() {
-        const numXBuckets = Math.floor(canvas.width / this.spaceBucketProperties.bucketSize) + 1;
-        const numYBuckets = Math.floor(canvas.height / this.spaceBucketProperties.bucketSize) + 1;
+        const numXBuckets = Math.floor(this.canvas.width / this.spaceBucketProperties.bucketSize) + 1;
+        const numYBuckets = Math.floor(this.canvas.height / this.spaceBucketProperties.bucketSize) + 1;
         
         this.spaceBuckets.length = numXBuckets;
 
@@ -540,367 +541,12 @@ class World {
     }
 
     cycle() {
-        world.updateBoids();
-        world.moveBoids();
-        world.drawBoids();
+        this.updateBoids();
+        this.moveBoids();
+        this.drawBoids();
         
-        world.reqAnimationFrameReturn = window.requestAnimationFrame(() => this.cycle())
+        this.reqAnimationFrameReturn = window.requestAnimationFrame(() => this.cycle())
     }
     
 }
 
-let canvas = document.getElementsByTagName("canvas")[0];
-canvas.width = canvas.clientWidth;
-canvas.height = canvas.clientHeight;    
-
-
-const world = new World(canvas);
-
-interface ControlPanelFieldOptions {
-    skip: boolean;
-    updateFunction: () => void;
-    isValid: (value: string) => boolean;
-    errorMessage: string;
-    inputTypeOverride: string;
-    defaultArrayValue: string;
-};
-
-const CONTROL_PANEL_FIELD_OPTIONS_DEFAULT: ControlPanelFieldOptions = {
-    skip: false,
-    updateFunction: () => {},
-    isValid: (string) => {return true},
-    errorMessage: "",
-    inputTypeOverride: "",
-    defaultArrayValue: ""
-}
-
-type ControlPanelOptions<Properties> = {
-    [Key in keyof Properties]?: Partial<ControlPanelFieldOptions>
-};
-
-function makePrimitiveInputNode(
-        name: string,
-        value: string | number | boolean,
-        fieldOptions: ControlPanelFieldOptions,
-        setValue: () => void) {
-    const input = document.createElement('input') as HTMLInputElement;
-    input.setAttribute('name', name as string);
-    input.setAttribute('value', value.toString());
-
-    if (fieldOptions.inputTypeOverride) {
-        input.setAttribute('type', fieldOptions.inputTypeOverride);
-    } else if (typeof value === "number") {
-        input.setAttribute('type', 'number');
-    } else if (typeof value === "boolean") {
-        input.setAttribute('type', 'checkbox');
-        input.toggleAttribute('checked', value as boolean);
-    } else if (typeof value === "string") {
-        // do nothing, use default input type.
-    } else {
-        let unsupportedInputValue: never = value;
-    }
-
-    input.addEventListener("change", () => {
-        if (!fieldOptions.isValid(input.value)) {
-            if (fieldOptions.errorMessage) {
-                input.setCustomValidity(fieldOptions.errorMessage);
-            } else {
-                input.setCustomValidity("invalid input");
-            }
-            input.reportValidity();
-        } else {
-            input.setCustomValidity("")
-            setValue();
-            fieldOptions.updateFunction();
-        }
-    });
-
-    return input;
-}
-
-function makeStringArrayInputNodes(
-        arrayName: string,
-        value: string[],
-        fieldOptions: ControlPanelFieldOptions,
-        controlPanelSection: HTMLElement) {
-    const div = document.createElement('div') as HTMLDivElement;
-    div.innerHTML = arrayName as string; 
-    controlPanelSection.appendChild(div);
-
-    function addField(i: number) {
-        const label = document.createElement('label');
-        label.innerHTML = arrayName;
-        div.appendChild(label);
-        const br = document.createElement('br');
-
-        const input = makePrimitiveInputNode(arrayName, value[i], fieldOptions,
-            () => {
-                value[i] = input.value;
-            });
-        label.appendChild(input);
-
-        const removeButton = document.createElement('input') as HTMLInputElement;
-        removeButton.setAttribute('type', 'button');
-        removeButton.setAttribute('value', 'x');
-        removeButton.addEventListener('click', () => {
-            value[i] = "";
-            br.remove();
-            label.remove();
-            input.remove();
-            removeButton.remove();
-            fieldOptions.updateFunction();
-        });
-        div.appendChild(removeButton);
-        div.appendChild(br);
-    }
-
-    const addButton = document.createElement('input') as HTMLInputElement;
-    addButton.setAttribute('type', 'button');
-    addButton.setAttribute('value', '+');
-    addButton.addEventListener('click', () => {
-        value.push(fieldOptions.defaultArrayValue);
-        addField(value.length - 1);
-        fieldOptions.updateFunction();
-    });
-    div.appendChild(addButton);
-    div.appendChild(document.createElement('br'));
-    
-    for(let i = 0; i < value.length; i++) {
-        addField(i);
-    }
-}
-
-
-function extendControlPanel<Properties extends IndexableProperties>(
-        sectionTitle: string,
-        properties: Properties, 
-        propertyOptions: ControlPanelOptions<Properties>,
-        controlPanel: HTMLDivElement) {
-    const controlPanelSection = document.createElement('p');
-    controlPanelSection.innerHTML = sectionTitle;
-    controlPanel.appendChild(controlPanelSection);
-    controlPanelSection.appendChild(document.createElement('br'));
-
-    for (const [kkey, value] of Object.entries(properties)) {
-        const key = kkey as keyof Properties;
-        
-        const fieldOptions: ControlPanelFieldOptions = {
-            ...CONTROL_PANEL_FIELD_OPTIONS_DEFAULT,
-            ...propertyOptions[kkey]
-        };
-            
-
-        if (fieldOptions.skip) {
-            continue;
-        }
-
-        if (typeof value === "number" ||
-            typeof value === "boolean" ||
-            typeof value === "string") {
-
-            const label = document.createElement('label');
-            label.innerHTML = kkey;
-            controlPanelSection.appendChild(label);
-        
-            const input = makePrimitiveInputNode(kkey, value, fieldOptions,
-                () => {
-                    if (typeof properties[key] === "number") {
-                        properties[key] = parseFloat(input.value) as Properties[typeof key];
-                    } else if (typeof properties[key] === "boolean") {
-                        properties[key] = input.checked as Properties[typeof key];
-                    } else if (typeof properties[key] === "string") {
-                        properties[key] = input.value as Properties[typeof key];
-                    }
-                });
-
-            label.appendChild(input);
-            controlPanelSection.appendChild(document.createElement('br'));
-        } else {
-            // value: string[]
-            makeStringArrayInputNodes(kkey, value, fieldOptions, controlPanelSection);
-        }
-    }
-}
-
-function updatePropertiesFromCgi<Properties extends IndexableProperties>(
-        keyPrefix: string,
-        properties: Properties, 
-        propertyOptions: ControlPanelOptions<Properties>) {
-    const arrayReset = new Set<string>();
-
-    const params = new URLSearchParams(document.location.search);
-    for (const [cgiKey, cgiValue] of params.entries()) {
-        const segments = cgiKey.split('.');
-        if (segments.length != 2 || segments[0] !== keyPrefix) {
-            continue;
-        }
-
-        const key = segments[1] as keyof Properties;
-        if (!Object.keys(properties).includes(key as string)) {
-            continue;
-        }
-
-        const fieldOptions: ControlPanelFieldOptions = {
-            ...CONTROL_PANEL_FIELD_OPTIONS_DEFAULT,
-            ...propertyOptions[key]
-        };
-
-        if (fieldOptions.skip) {
-            continue;
-        }
-
-        if (!fieldOptions.isValid(cgiValue)) {
-            continue;
-        }
-
-        if (typeof properties[key] === "number") {
-            properties[key] = parseFloat(cgiValue) as Properties[typeof key];
-        } else if (typeof properties[key] === "boolean") {
-            if (cgiValue === '') {
-                properties[key] = true as Properties[typeof key];
-            } else {
-                properties[key] = (cgiValue === 't' || cgiValue === 'true') as Properties[typeof key];
-            }
-        } else if (typeof properties[key] === "string") {
-            properties[key] = cgiValue as Properties[typeof key];
-        } else if (properties[key] instanceof Array) {
-            // If this is the first item we're seeing from an array, 
-            // reset the array to clear out the default values.
-            if (!arrayReset.has(key as string)) {
-                // quietly amazed that this works.
-                (properties[key] as string[]) = [];
-                arrayReset.add(key as string);
-            }
-            (properties[key] as string[]).push(cgiValue);
-        }
-
-        fieldOptions.updateFunction();
-    }
- }
-
-
-const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
-
-function stringNumChecker(requireInt: boolean, min?: number, max?: number): (input:string) => boolean {
-    return (input: string) => {
-        const n = parseFloat(input);
-        if (isNaN(n)) {
-            return false;
-        }
-
-        if (requireInt && n !== Math.trunc(n)) {
-            return false;
-        }
-
-        if (min !== undefined && n < min) {
-            return false;
-        }
-
-        if (max !== undefined && n > max) {
-            return false;
-        }
-
-        return true;
-    }
-}
-
-const worldPropertiesOptions: ControlPanelOptions<WorldProperties> = {
-    width: {skip: true},
-    height: {skip: true},
-    numBoids: {
-        updateFunction: () => {world.updateNumBoids();},
-        isValid: stringNumChecker(true, 0),
-        errorMessage: "numBoids must be a non-negative integer"
-    },
-    continuousCohorts: {updateFunction: () => {world.updateCohorts();}},
-    cohortColors: {
-        inputTypeOverride: "color",
-        isValid: (value: string) => { return CSS.supports("color", value)},
-        updateFunction: () => {world.updateCohorts();},
-        defaultArrayValue: "#000000",
-    },
-    backgroundColor: {
-        inputTypeOverride: "color",
-        isValid: (value: string) => { return CSS.supports("color", value)},
-    },
-    backgroundOpacity: {
-        isValid: stringNumChecker(true, 0, 100),
-        errorMessage: "backgroundOpacity must be an integer in the range of [0-100]"
-    }
-};
-updatePropertiesFromCgi("wp", world.worldProperties, worldPropertiesOptions);
-extendControlPanel("World Properties", world.worldProperties,
-    worldPropertiesOptions, controlPanel);
-
-const spaceBucketPropertiesOptions: ControlPanelOptions<SpaceBucketProperties> = {
-    bucketSize: {
-        updateFunction: () => {world.resetSpaceBuckets()},
-        isValid: stringNumChecker(true, 1),
-        errorMessage: "bucketSize must be a positive integer"
-    }
-};
-updatePropertiesFromCgi("sp", world.spaceBucketProperties, spaceBucketPropertiesOptions);
-extendControlPanel("Space Bucket Properties", world.spaceBucketProperties,
-    spaceBucketPropertiesOptions, controlPanel);
-
-const boidPropertiesOptions: ControlPanelOptions<BoidProperties> = {
-    awarenessRadius: {updateFunction: () => {world.updateDerivedBoidProperties()}},
-    maxAcceleration: {updateFunction: () => {world.updateDerivedBoidProperties()}},
-};
-updatePropertiesFromCgi("bp", world.boidProperties, boidPropertiesOptions);
-extendControlPanel("Boid Properties", world.boidProperties, boidPropertiesOptions, controlPanel);
-
-
-function setCgiParams<Properties extends IndexableProperties>(
-        prefix: string, 
-        properties: Properties,
-        defaultProperties: Properties,
-        propertyOptions: ControlPanelOptions<Properties>,
-        searchParams: URLSearchParams) {
-    for(const [key, value] of Object.entries(properties)) {
-        const fieldOptions: ControlPanelFieldOptions = {
-            ...CONTROL_PANEL_FIELD_OPTIONS_DEFAULT,
-            ...propertyOptions[key]
-        };
-
-        if (fieldOptions.skip) {
-            continue;
-        }
-
-        if (typeof value === "number" ||
-            typeof value === "boolean" ||
-            typeof value === "string") {
-            if (value != defaultProperties[key]) {
-                searchParams.set(prefix + '.' + key, `${value}`);
-            } 
-        } else {
-            // value: string[]
-            if (value.toString() !== defaultProperties[key].toString()) {
-                for(const v of value) {
-                    if (fieldOptions.isValid(v)) {
-                        searchParams.append(prefix + '.' + key, `${v}`);
-                    }
-                }
-            }
-        }
-    }
-}
-
-function getUrl() {
-    const url = new URL(window.location.href.split('?')[0]);
-    const searchParams = url.searchParams;
-    
-    setCgiParams("wp", world.worldProperties, WORLD_PROPERTIES_DEFAULT, worldPropertiesOptions, searchParams);
-    setCgiParams("sp", world.spaceBucketProperties, SPACE_BUCKET_PROPERTIES_DEFAULT, spaceBucketPropertiesOptions, searchParams);
-    setCgiParams("bp", world.boidProperties, BOID_PROPERTIES_DEFAULT, boidPropertiesOptions, searchParams);
-
-    const gottenUrl = document.getElementById("gottenUrl") as HTMLElement;
-    gottenUrl.innerHTML = url.toString();
-}
-
-const getUrlButton = document.getElementById("getUrlButton") as HTMLElement;
-getUrlButton.addEventListener("click", getUrl);
-
-
-        
-world.cycle();
