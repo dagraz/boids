@@ -5,7 +5,11 @@ canvas.width = canvas.clientWidth;
 canvas.height = canvas.clientHeight;    
 
 
-const world = new boids.World(canvas);
+const world = new boids.World(
+    canvas,
+    boids.worldPropertiesDefault,
+    boids.boidPropertiesDefault,
+    boids.spaceBucketPropertiesDefault);
 
 export interface ControlPanelFieldOptions {
     skip: boolean;

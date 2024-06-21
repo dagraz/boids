@@ -350,17 +350,21 @@ export class World {
     
     spaceBuckets: Boid[][][];
 
-    constructor(canvas: HTMLCanvasElement) {
+    constructor(
+            canvas: HTMLCanvasElement,
+            worldProperties: WorldProperties,
+            boidProperties: BoidProperties,
+            spaceBucketProperties: SpaceBucketProperties) {
         this.canvas = canvas;
         this.context = canvas.getContext("2d") as CanvasRenderingContext2D;
-        this.boidProperties = {...boidPropertiesDefault };
+        this.boidProperties = boidProperties,
         this.derivedBoidProperties = {... derivedBoidPropertiesDefault};
         this.updateDerivedBoidProperties();
 
-        this.spaceBucketProperties = spaceBucketPropertiesDefault;
+        this.spaceBucketProperties = spaceBucketProperties;
 
-        this.worldProperties = {...worldPropertiesDefault};
-        this.worldProperties.cohortColors = worldPropertiesDefault.cohortColors.slice();
+        this.worldProperties = worldProperties;
+        // this.worldProperties.cohortColors = worldPropertiesDefault.cohortColors.slice();
         this.worldProperties.width = canvas.width;
         this.worldProperties.height = canvas.height;
 
