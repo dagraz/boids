@@ -11,6 +11,9 @@
 //    feels like it could be cleaned up and wrapped into a separate library.
 //  * 3d!
 //  * made the animation cycle sensitive to passed time
+//  * ghost lines come from precision limitations of how alpha blending is implemented with 8-bit arithmetic
+//    * provide an option to snap near color values to the background color.  
+//    * can programatically determine the right window with some reasonably pessimistic assumptions
 
 
 
@@ -546,6 +549,5 @@ export class World {
         
         this.reqAnimationFrameReturn = window.requestAnimationFrame(() => this.cycle())
     }
-    
 }
 

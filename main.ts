@@ -1,33 +1,15 @@
+// TODO:
+//   * come up with more coherent names for ControlPanel stuff
+//   * move bulk of ControlPanel logic to a separate file
+
 import * as boids from "./boid.js";
 
-// used for runtime property changes
 export interface IndexableProperties {
     [index:string]: number | boolean | string | string[];
 }
 
-let canvas = document.getElementsByTagName("canvas")[0];
-canvas.width = canvas.clientWidth;
-canvas.height = canvas.clientHeight;    
 
-const worldProperties = Object.assign({} as IndexableProperties, boids.worldPropertiesDefault);
-worldProperties.cohortColors = boids.worldPropertiesDefault.cohortColors.slice();
-
-
-const worldPropertiesDefault = Object.assign({} as IndexableProperties, boids.worldPropertiesDefault);
-worldPropertiesDefault.cohortColors = boids.worldPropertiesDefault.cohortColors.slice();
-
-const boidProperties = Object.assign({} as IndexableProperties, boids.boidPropertiesDefault);
-const boidPropertiesDefault = Object.assign({} as IndexableProperties, boids.boidPropertiesDefault);
-const spaceBucketProperties = Object.assign({} as IndexableProperties, boids.spaceBucketPropertiesDefault);
-const spaceBucketPropertiesDefault = Object.assign({} as IndexableProperties, boids.spaceBucketPropertiesDefault);
-
-const world = new boids.World(
-    canvas,
-    worldProperties,
-    boidProperties,
-    spaceBucketProperties);
-
-export interface ControlPanelFieldOptions {
+export interface ConfigurationFieldOptions {
     skip: boolean;
     updateFunction: () => void;
     isValid: (value: string) => boolean;
@@ -36,7 +18,7 @@ export interface ControlPanelFieldOptions {
     defaultArrayValue: string;
 };
 
-export const controlPanelFieldOptionsDefault: ControlPanelFieldOptions = {
+export const configurationFieldOptionsDefault: ConfigurationFieldOptions = {
     skip: false,
     updateFunction: () => {},
     isValid: (string) => {return true},
@@ -45,14 +27,14 @@ export const controlPanelFieldOptionsDefault: ControlPanelFieldOptions = {
     defaultArrayValue: ""
 }
 
-export type ControlPanelOptions<Properties> = {
-    [Key in keyof Properties]?: Partial<ControlPanelFieldOptions>
+export type ConfigurationOptions<Properties> = {
+    [Key in keyof Properties]?: Partial<ConfigurationFieldOptions>
 };
 
 function makePrimitiveInputNode(
         name: string,
         value: string | number | boolean,
-        fieldOptions: ControlPanelFieldOptions,
+        fieldOptions: ConfigurationFieldOptions,
         setValue: () => void) {
     const input = document.createElement('input') as HTMLInputElement;
     input.setAttribute('name', name as string);
@@ -92,7 +74,7 @@ function makePrimitiveInputNode(
 function makeStringArrayInputNodes(
         arrayName: string,
         value: string[],
-        fieldOptions: ControlPanelFieldOptions,
+        fieldOptions: ConfigurationFieldOptions,
         controlPanelSection: HTMLElement) {
     const div = document.createElement('div') as HTMLDivElement;
     div.innerHTML = arrayName as string; 
@@ -142,10 +124,10 @@ function makeStringArrayInputNodes(
 }
 
 
-export function extendControlPanel<Properties extends IndexableProperties>(
+export function extendConfigurationControlPanel<Properties extends IndexableProperties>(
         sectionTitle: string,
         properties: Properties, 
-        propertyOptions: ControlPanelOptions<Properties>,
+        propertyOptions: ConfigurationOptions<Properties>,
         controlPanel: HTMLDivElement) {
     const controlPanelSection = document.createElement('p');
     controlPanelSection.innerHTML = sectionTitle;
@@ -155,8 +137,8 @@ export function extendControlPanel<Properties extends IndexableProperties>(
     for (const [kkey, value] of Object.entries(properties)) {
         const key = kkey as keyof Properties;
         
-        const fieldOptions: ControlPanelFieldOptions = {
-            ...controlPanelFieldOptionsDefault,
+        const fieldOptions: ConfigurationFieldOptions = {
+            ...configurationFieldOptionsDefault,
             ...propertyOptions[kkey]
         };
             
@@ -193,10 +175,10 @@ export function extendControlPanel<Properties extends IndexableProperties>(
     }
 }
 
-function updatePropertiesFromCgi<Properties extends IndexableProperties>(
+function updateConfigurationFromCgi<Properties extends IndexableProperties>(
         keyPrefix: string,
         properties: Properties, 
-        propertyOptions: ControlPanelOptions<Properties>) {
+        propertyOptions: ConfigurationOptions<Properties>) {
     const arrayReset = new Set<string>();
 
     const params = new URLSearchParams(document.location.search);
@@ -211,8 +193,8 @@ function updatePropertiesFromCgi<Properties extends IndexableProperties>(
             continue;
         }
 
-        const fieldOptions: ControlPanelFieldOptions = {
-            ...controlPanelFieldOptionsDefault,
+        const fieldOptions: ConfigurationFieldOptions = {
+            ...configurationFieldOptionsDefault,
             ...propertyOptions[key]
         };
 
@@ -250,8 +232,6 @@ function updatePropertiesFromCgi<Properties extends IndexableProperties>(
  }
 
 
-const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
-
 function stringNumChecker(requireInt: boolean, min?: number, max?: number): (input:string) => boolean {
     return (input: string) => {
         const n = parseFloat(input);
@@ -275,7 +255,31 @@ function stringNumChecker(requireInt: boolean, min?: number, max?: number): (inp
     }
 }
 
-const worldPropertiesOptions: ControlPanelOptions<boids.WorldProperties> = {
+const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
+
+let canvas = document.getElementsByTagName("canvas")[0];
+canvas.width = canvas.clientWidth;
+canvas.height = canvas.clientHeight;    
+
+const worldProperties = Object.assign({} as IndexableProperties, boids.worldPropertiesDefault);
+worldProperties.cohortColors = boids.worldPropertiesDefault.cohortColors.slice();
+
+
+const worldPropertiesDefault = Object.assign({} as IndexableProperties, boids.worldPropertiesDefault);
+worldPropertiesDefault.cohortColors = boids.worldPropertiesDefault.cohortColors.slice();
+
+const boidProperties = Object.assign({} as IndexableProperties, boids.boidPropertiesDefault);
+const boidPropertiesDefault = Object.assign({} as IndexableProperties, boids.boidPropertiesDefault);
+const spaceBucketProperties = Object.assign({} as IndexableProperties, boids.spaceBucketPropertiesDefault);
+const spaceBucketPropertiesDefault = Object.assign({} as IndexableProperties, boids.spaceBucketPropertiesDefault);
+
+const world = new boids.World(
+    canvas,
+    worldProperties,
+    boidProperties,
+    spaceBucketProperties);
+
+const worldPropertiesOptions: ConfigurationOptions<boids.WorldProperties> = {
     width: {skip: true},
     height: {skip: true},
     numBoids: {
@@ -299,38 +303,38 @@ const worldPropertiesOptions: ControlPanelOptions<boids.WorldProperties> = {
         errorMessage: "backgroundOpacity must be an integer in the range of [0-100]"
     }
 };
-updatePropertiesFromCgi("wp", worldProperties, worldPropertiesOptions);
-extendControlPanel("World Properties", worldProperties,
+updateConfigurationFromCgi("wp", worldProperties, worldPropertiesOptions);
+extendConfigurationControlPanel("World Properties", worldProperties,
     worldPropertiesOptions, controlPanel);
 
-const spaceBucketPropertiesOptions: ControlPanelOptions<boids.SpaceBucketProperties> = {
+const spaceBucketPropertiesOptions: ConfigurationOptions<boids.SpaceBucketProperties> = {
     bucketSize: {
         updateFunction: () => {world.resetSpaceBuckets()},
         isValid: stringNumChecker(true, 1),
         errorMessage: "bucketSize must be a positive integer"
     }
 };
-updatePropertiesFromCgi("sp", spaceBucketProperties, spaceBucketPropertiesOptions);
-extendControlPanel("Space Bucket Properties", spaceBucketProperties,
+updateConfigurationFromCgi("sp", spaceBucketProperties, spaceBucketPropertiesOptions);
+extendConfigurationControlPanel("Space Bucket Properties", spaceBucketProperties,
     spaceBucketPropertiesOptions, controlPanel);
 
-const boidPropertiesOptions: ControlPanelOptions<boids.BoidProperties> = {
+const boidPropertiesOptions: ConfigurationOptions<boids.BoidProperties> = {
     awarenessRadius: {updateFunction: () => {world.updateDerivedBoidProperties()}},
     maxAcceleration: {updateFunction: () => {world.updateDerivedBoidProperties()}},
 };
-updatePropertiesFromCgi("bp", boidProperties, boidPropertiesOptions);
-extendControlPanel("Boid Properties", boidProperties, boidPropertiesOptions, controlPanel);
+updateConfigurationFromCgi("bp", boidProperties, boidPropertiesOptions);
+extendConfigurationControlPanel("Boid Properties", boidProperties, boidPropertiesOptions, controlPanel);
 
 
 function setCgiParams<Properties extends IndexableProperties>(
         prefix: string, 
         properties: Properties,
         defaultProperties: Properties,
-        propertyOptions: ControlPanelOptions<Properties>,
+        propertyOptions: ConfigurationOptions<Properties>,
         searchParams: URLSearchParams) {
     for(const [key, value] of Object.entries(properties)) {
-        const fieldOptions: ControlPanelFieldOptions = {
-            ...controlPanelFieldOptionsDefault,
+        const fieldOptions: ConfigurationFieldOptions = {
+            ...configurationFieldOptionsDefault,
             ...propertyOptions[key]
         };
 
