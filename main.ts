@@ -77,7 +77,6 @@ config.updateConfigurationFromCgi("bp", boidProperties, boidPropertiesOptions);
 config.extendConfigurationControlPanel("Boid Properties", boidProperties, boidPropertiesOptions, controlPanel);
 
 
-
 function getUrl() {
     const url = new URL(window.location.href.split('?')[0]);
     const searchParams = url.searchParams;
@@ -93,4 +92,4 @@ function getUrl() {
 const getUrlButton = document.getElementById("getUrlButton") as HTMLElement;
 getUrlButton.addEventListener("click", getUrl);
 
-world.cycle();
+world.cycle(performance.now());

@@ -7,10 +7,7 @@
 //    * legibility
 //      * make control panel more legible
 //      * figure out how to make the generated URL wrap or be in a scrolling box or something
-//  * configuration / property management (on-page control-panel, cgi parsing, url generation) 
-//    feels like it could be cleaned up and wrapped into a separate library.
 //  * 3d!
-//  * made the animation cycle sensitive to passed time
 //  * ghost lines come from precision limitations of how alpha blending is implemented with 8-bit arithmetic
 //    * provide an option to snap near color values to the background color.  
 //    * can programatically determine the right window with some reasonably pessimistic assumptions
@@ -305,16 +302,16 @@ export class Boid {
         }
     }
 
-    updatePosition() {
+    updatePosition(timeStep: number, halfTimeStepSquared: number) {
         // distance = velocity * time + 1/2 * acceleration * time^2
-        this.x += this.vx + 0.5 * this.deltaVx;
-        this.y += this.vy + 0.5 * this.deltaVy;
+        this.x += this.vx * timeStep + this.deltaVx * halfTimeStepSquared;
+        this.y += this.vy * timeStep + this.deltaVy * halfTimeStepSquared;
     }
 
-    updateVelocity() {
+    updateVelocity(timeStep: number) {
         // update and cap velocity
-        this.vx += this.deltaVx;
-        this.vy += this.deltaVy;
+        this.vx += this.deltaVx * timeStep;
+        this.vy += this.deltaVy * timeStep;
 
         this.speed = Math.sqrt(square(this.vx) + square(this.vy));
         if (this.speed < this.boidProperties.minSpeed && this.speed > 0) {
@@ -345,8 +342,11 @@ export class World {
 
     mousePosition: {x: number, y: number} | null;
     running: boolean = true;
+
     reqAnimationFrameReturn: number = 0;
-    
+    lastTimeStamp: number;
+    timeStep: number = 1;
+
     spaceBuckets: Boid[][][];
 
     constructor(
@@ -376,6 +376,8 @@ export class World {
         this.updateNumBoids();
 
         this.setupMouse();
+
+        this.lastTimeStamp = performance.now();
     }
 
     setupMouse() {
@@ -397,7 +399,8 @@ export class World {
                 window.cancelAnimationFrame(this.reqAnimationFrameReturn);
                 this.running = false;
             } else {
-                this.reqAnimationFrameReturn = window.requestAnimationFrame(() => this.cycle());
+                this.reqAnimationFrameReturn = window.requestAnimationFrame(
+                    (t: number) => this.cycle(t));
                 this.running = true;
             }
         });
@@ -491,9 +494,10 @@ export class World {
     }
 
     moveBoids() {
+        const halfTimeStepSquared = 0.5 * square(this.timeStep);
         for (let boid of this.boids) {
-            boid.updatePosition();
-            boid.updateVelocity();
+            boid.updatePosition(this.timeStep, halfTimeStepSquared);
+            boid.updateVelocity(this.timeStep);
         }
     }   
     
@@ -542,12 +546,18 @@ export class World {
         }
     }
 
-    cycle() {
+    cycle(timeStamp: number) {
+        // For a 60fps screen, each refresh is about one step
+        this.timeStep = Math.min(2, (timeStamp - this.lastTimeStamp) / 16);
+        
         this.updateBoids();
         this.moveBoids();
         this.drawBoids();
         
-        this.reqAnimationFrameReturn = window.requestAnimationFrame(() => this.cycle())
+        this.lastTimeStamp = timeStamp;
+
+        this.reqAnimationFrameReturn = window.requestAnimationFrame(
+            (t: number) => this.cycle(t))
     }
 }
 
