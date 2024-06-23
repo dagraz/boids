@@ -225,6 +225,40 @@ export function updateConfigurationFromCgi<Properties extends IndexablePropertie
     }
  }
 
+ export function setCgiParams<Properties extends IndexableProperties>(
+        prefix: string, 
+        properties: Properties,
+        defaultProperties: Properties,
+        propertyOptions: ConfigurationOptions<Properties>,
+        searchParams: URLSearchParams) {
+    for(const [key, value] of Object.entries(properties)) {
+        const fieldOptions: ConfigurationFieldOptions = {
+            ...configurationFieldOptionsDefault,
+            ...propertyOptions[key]
+        };
+
+        if (fieldOptions.skip) {
+            continue;
+        }
+
+        if (typeof value === "number" ||
+            typeof value === "boolean" ||
+            typeof value === "string") {
+            if (value != defaultProperties[key]) {
+                searchParams.set(prefix + '.' + key, `${value}`);
+            } 
+        } else {
+            // value: string[]
+            if (value.toString() !== defaultProperties[key].toString()) {
+                for(const v of value) {
+                    if (fieldOptions.isValid(v)) {
+                        searchParams.append(prefix + '.' + key, `${v}`);
+                    }
+                }
+            }
+        }
+    }
+}
 
 export function stringNumChecker(requireInt: boolean, min?: number, max?: number): (input:string) => boolean {
     return (input: string) => {

@@ -77,48 +77,14 @@ config.updateConfigurationFromCgi("bp", boidProperties, boidPropertiesOptions);
 config.extendConfigurationControlPanel("Boid Properties", boidProperties, boidPropertiesOptions, controlPanel);
 
 
-function setCgiParams<Properties extends config.IndexableProperties>(
-        prefix: string, 
-        properties: Properties,
-        defaultProperties: Properties,
-        propertyOptions: config.ConfigurationOptions<Properties>,
-        searchParams: URLSearchParams) {
-    for(const [key, value] of Object.entries(properties)) {
-        const fieldOptions: config.ConfigurationFieldOptions = {
-            ...config.configurationFieldOptionsDefault,
-            ...propertyOptions[key]
-        };
-
-        if (fieldOptions.skip) {
-            continue;
-        }
-
-        if (typeof value === "number" ||
-            typeof value === "boolean" ||
-            typeof value === "string") {
-            if (value != defaultProperties[key]) {
-                searchParams.set(prefix + '.' + key, `${value}`);
-            } 
-        } else {
-            // value: string[]
-            if (value.toString() !== defaultProperties[key].toString()) {
-                for(const v of value) {
-                    if (fieldOptions.isValid(v)) {
-                        searchParams.append(prefix + '.' + key, `${v}`);
-                    }
-                }
-            }
-        }
-    }
-}
 
 function getUrl() {
     const url = new URL(window.location.href.split('?')[0]);
     const searchParams = url.searchParams;
     
-    setCgiParams("wp", worldProperties, worldPropertiesDefault, worldPropertiesOptions, searchParams);
-    setCgiParams("sp", spaceBucketProperties, spaceBucketPropertiesDefault, spaceBucketPropertiesOptions, searchParams);
-    setCgiParams("bp", boidProperties, boidPropertiesDefault, boidPropertiesOptions, searchParams);
+    config.setCgiParams("wp", worldProperties, worldPropertiesDefault, worldPropertiesOptions, searchParams);
+    config.setCgiParams("sp", spaceBucketProperties, spaceBucketPropertiesDefault, spaceBucketPropertiesOptions, searchParams);
+    config.setCgiParams("bp", boidProperties, boidPropertiesDefault, boidPropertiesOptions, searchParams);
 
     const gottenUrl = document.getElementById("gottenUrl") as HTMLElement;
     gottenUrl.innerHTML = url.toString();
@@ -127,6 +93,4 @@ function getUrl() {
 const getUrlButton = document.getElementById("getUrlButton") as HTMLElement;
 getUrlButton.addEventListener("click", getUrl);
 
-
-        
 world.cycle();
