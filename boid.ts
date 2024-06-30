@@ -3,10 +3,6 @@
 //  * https://vanhunteradams.com/Pico/Animal_Movement/Boids-algorithm.html
 //
 // todo: 
-//  * configuration changes
-//    * legibility
-//      * make control panel more legible
-//      * figure out how to make the generated URL wrap or be in a scrolling box or something
 //  * 3d!
 //  * ghost lines come from precision limitations of how alpha blending is implemented with 8-bit arithmetic
 //    * provide an option to snap near color values to the background color.  

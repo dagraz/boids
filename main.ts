@@ -1,6 +1,11 @@
 // TODO:
-//   * come up with more coherent names for ControlPanel stuff
-//   * move bulk of ControlPanel logic to a separate file
+//   * Config option for two-column vs full-bleed
+//   * config panel: 
+//     *in fullscreen mode on mobile, cohort color text is small
+//     * make control panel more legible
+//     * figure out how to make the generated URL wrap or be in a scrolling box or something
+//   * file level comments
+
 
 import * as boids from "./boid.js";
 import * as config from "./config_manager.js";
@@ -28,7 +33,7 @@ const world = new boids.World(
     boidProperties,
     spaceBucketProperties);
 
-    
+
 const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
 const worldPropertiesOptions: config.ConfigurationOptions<boids.WorldProperties> = {
     numBoids: {
