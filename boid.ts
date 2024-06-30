@@ -351,28 +351,34 @@ export class World {
             worldProperties: WorldProperties,
             boidProperties: BoidProperties,
             spaceBucketProperties: SpaceBucketProperties) {
-        this.canvas = canvas;
-        this.context = canvas.getContext("2d") as CanvasRenderingContext2D;
-        this.boidProperties = boidProperties,
+        this.boidProperties = boidProperties;
         this.derivedBoidProperties = {... derivedBoidPropertiesDefault};
         this.updateDerivedBoidProperties();
-
         this.spaceBucketProperties = spaceBucketProperties;
-
         this.worldProperties = worldProperties;
 
-        this.mousePosition = null;
-
         this.spaceBuckets = [];
-        this.resetSpaceBuckets();
+
+        this.canvas = canvas;
+        this.context = canvas.getContext("2d") as CanvasRenderingContext2D;
+        this.resizeCanvas();
+
+        this.mousePosition = null;
+        this.setupMouse();
 
         this.colors = [];
         this.boids = []
         this.updateNumBoids();
 
-        this.setupMouse();
-
         this.lastTimeStamp = performance.now();
+    }
+
+    resizeCanvas() {
+        // Sets up a full-bleed canvas
+        // TODO: provide an option for two columns
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+        this.resetSpaceBuckets();
     }
 
     setupMouse() {

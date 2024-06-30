@@ -6,11 +6,9 @@ import * as boids from "./boid.js";
 import * as config from "./config_manager.js";
 
 
-const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
+
 
 const canvas = document.getElementsByTagName("canvas")[0];
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
 
 const worldProperties = Object.assign({} as config.IndexableProperties, boids.worldPropertiesDefault);
 worldProperties.cohortColors = boids.worldPropertiesDefault.cohortColors.slice();
@@ -30,6 +28,8 @@ const world = new boids.World(
     boidProperties,
     spaceBucketProperties);
 
+    
+const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
 const worldPropertiesOptions: config.ConfigurationOptions<boids.WorldProperties> = {
     numBoids: {
         updateFunction: () => {world.updateNumBoids();},
@@ -91,10 +91,7 @@ const getUrlButton = document.getElementById("getUrlButton") as HTMLElement;
 getUrlButton.addEventListener("click", getUrl);
 
 window.onresize = () => {
-    // todo: this should be wrapped into a world method, also called from world's constructor
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    world.resetSpaceBuckets();
+    world.resizeCanvas();
 };
 
 
