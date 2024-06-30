@@ -1,12 +1,14 @@
 #canvas {
-    width: 1000px;
-    height: 800px;
+    /* width: 100vw;
+    height: 100vw; */
+    margin-left: calc(50% - 50vw);
+    margin-top: calc(50% - 50vw);
 }
 
 .two-columns {
-    display:flex;
+    /* display:flex;
     flex-wrap:wrap;
-    flex-direction:row;
+    flex-direction:row; */
 }
 
 .controlPanel {

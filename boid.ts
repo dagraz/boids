@@ -26,8 +26,6 @@ export interface WorldProperties {
     homogenousCohorts: boolean;
     cohortColors: string[];
     gravity: number;
-    width: number;
-    height: number;
     circularBorder: boolean;
     backgroundColor: string;
     backgroundOpacity: string;
@@ -39,8 +37,6 @@ export const worldPropertiesDefault: WorldProperties = {
     homogenousCohorts: true,
     cohortColors: ["#ff0000", "#0000ff"],
     gravity: 0,
-    width: -1,
-    height: -1,
     circularBorder: false,
     backgroundColor: "#ffffff",
     backgroundOpacity: "10"
@@ -118,7 +114,8 @@ function boidDistance(boidA: Boid, boidB: Boid): number {
 export class Boid {
     constructor(public x: number, public y: number, public speed: number, direction: number, 
             boidProperties: BoidProperties, derivedBoidProperties: DerivedBoidProperties,
-            worldProperties: WorldProperties, cohortProperties: CohortProperties) {
+            worldProperties: WorldProperties, cohortProperties: CohortProperties,
+            public canvas: HTMLCanvasElement) {
         this.vx = speed * Math.cos(direction);
         this.vy = speed * Math.sin(direction);
         this.deltaVx = 0;
@@ -187,12 +184,12 @@ export class Boid {
 
         // avoid edges
         if (this.worldProperties.circularBorder) {
-            const centerWidth = 0.5 * this.worldProperties.width;
-            const centerHeight = 0.5 * this.worldProperties.height;
+            const centerWidth = 0.5 * this.canvas.width;
+            const centerHeight = 0.5 * this.canvas.height;
             const distanceFromCenter = Math.sqrt(
                 square(this.x - centerWidth) + square(this.y - centerHeight));
                 
-            const distanceFromEdge = 0.5 * Math.min(this.worldProperties.width, this.worldProperties.height) - 
+            const distanceFromEdge = 0.5 * Math.min(this.canvas.width, this.canvas.height) - 
                 distanceFromCenter;
             const edgeAvoidanceScale = this.edgeAvoidance(distanceFromEdge) / distanceFromCenter;
             this.deltaVx += edgeAvoidanceScale * (centerWidth - this.x);
@@ -200,9 +197,9 @@ export class Boid {
         } else {
             // rectangular border
             this.deltaVx += this.edgeAvoidance(this.x);
-            this.deltaVx -= this.edgeAvoidance(this.worldProperties.width - this.x);
+            this.deltaVx -= this.edgeAvoidance(this.canvas.width - this.x);
             this.deltaVy += this.edgeAvoidance(this.y);
-            this.deltaVy -= this.edgeAvoidance(this.worldProperties.height - this.y);
+            this.deltaVy -= this.edgeAvoidance(this.canvas.height - this.y);
         }
 
         let sumX = 0;
@@ -363,8 +360,6 @@ export class World {
         this.spaceBucketProperties = spaceBucketProperties;
 
         this.worldProperties = worldProperties;
-        this.worldProperties.width = canvas.width;
-        this.worldProperties.height = canvas.height;
 
         this.mousePosition = null;
 
@@ -407,12 +402,12 @@ export class World {
         
     }
     xToBucket(x: number): number {
-        const cleanX = Math.min(this.worldProperties.width, Math.max(0, x));
+        const cleanX = Math.min(this.canvas.width, Math.max(0, x));
         return Math.floor(cleanX / this.spaceBucketProperties.bucketSize);
     }
 
     yToBucket(y: number): number {
-        const cleanY = Math.min(this.worldProperties.height, Math.max(0, y));
+        const cleanY = Math.min(this.canvas.height, Math.max(0, y));
         return Math.floor(cleanY / this.spaceBucketProperties.bucketSize);
     }
 
@@ -452,11 +447,12 @@ export class World {
             let cohortProperties: CohortProperties = {cohort: 0, color: "green", cohortSeed: cohortSeed};
 
             const boid = new Boid(
-                Math.random() * this.worldProperties.width,
-                Math.random() * this.worldProperties.height,
+                Math.random() * this.canvas.width,
+                Math.random() * this.canvas.height,
                 1, Math.random() * 2 * Math.PI, 
                 this.boidProperties, this.derivedBoidProperties,
-                this.worldProperties, cohortProperties);
+                this.worldProperties, cohortProperties,
+                this.canvas);
 
             this.boids.push(boid);
         }

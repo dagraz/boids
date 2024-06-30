@@ -8,9 +8,9 @@ import * as config from "./config_manager.js";
 
 const controlPanel = document.querySelector("[name=controlPanel]") as HTMLDivElement;
 
-let canvas = document.getElementsByTagName("canvas")[0];
-canvas.width = canvas.clientWidth;
-canvas.height = canvas.clientHeight;    
+const canvas = document.getElementsByTagName("canvas")[0];
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
 const worldProperties = Object.assign({} as config.IndexableProperties, boids.worldPropertiesDefault);
 worldProperties.cohortColors = boids.worldPropertiesDefault.cohortColors.slice();
@@ -31,8 +31,6 @@ const world = new boids.World(
     spaceBucketProperties);
 
 const worldPropertiesOptions: config.ConfigurationOptions<boids.WorldProperties> = {
-    width: {skip: true},
-    height: {skip: true},
     numBoids: {
         updateFunction: () => {world.updateNumBoids();},
         isValid: config.stringNumChecker(true, 0),
@@ -91,5 +89,13 @@ function getUrl() {
 
 const getUrlButton = document.getElementById("getUrlButton") as HTMLElement;
 getUrlButton.addEventListener("click", getUrl);
+
+window.onresize = () => {
+    // todo: this should be wrapped into a world method, also called from world's constructor
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    world.resetSpaceBuckets();
+};
+
 
 world.cycle(performance.now());
