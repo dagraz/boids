@@ -24,7 +24,7 @@ export interface WorldProperties {
     gravity: number;
     circularBorder: boolean;
     backgroundColor: string;
-    backgroundOpacity: string;
+    backgroundOpacity: number;
 }
 
 export const worldPropertiesDefault: WorldProperties = {
@@ -35,7 +35,7 @@ export const worldPropertiesDefault: WorldProperties = {
     gravity: 0,
     circularBorder: false,
     backgroundColor: "#ffffff",
-    backgroundOpacity: "10"
+    backgroundOpacity: 10,
 }
 
 
