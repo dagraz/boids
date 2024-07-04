@@ -368,12 +368,9 @@ export class World {
 
         this.lastTimeStamp = performance.now();
     }
-
     resizeCanvas() {
-        // Sets up a full-bleed canvas
-        // TODO: provide an option for two columns
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+        this.context.fillStyle = this.worldProperties.backgroundColor;
+        this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
         this.resetSpaceBuckets();
     }
 
