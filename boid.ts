@@ -400,6 +400,7 @@ export class World {
         });
         
     }
+    
     xToBucket(x: number): number {
         const cleanX = Math.min(this.canvas.width, Math.max(0, x));
         return Math.floor(cleanX / this.spaceBucketProperties.bucketSize);

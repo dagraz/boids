@@ -14,6 +14,8 @@ import * as config from "./config_manager.js";
 
 
 const canvas = document.getElementsByTagName("canvas")[0];
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
 const worldProperties = Object.assign({} as config.IndexableProperties, boids.worldPropertiesDefault);
 worldProperties.cohortColors = boids.worldPropertiesDefault.cohortColors.slice();
