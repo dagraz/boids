@@ -379,8 +379,8 @@ export class World {
             if (this.mousePosition === null) {
                 this.mousePosition = {x: 0, y: 0};
             }
-            this.mousePosition.x = e.clientX;
-            this.mousePosition.y = e.clientY;
+            this.mousePosition.x = e.offsetX;
+            this.mousePosition.y = e.offsetY;
           });
         
         this.canvas.addEventListener("mouseout", (e) => {
