@@ -100,7 +100,7 @@ getUrlButton.addEventListener("click", getUrl);
 window.onresize = () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    world.resizeCanvas();
+    world.resetCanvas();
 };
 
 

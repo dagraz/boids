@@ -357,7 +357,7 @@ export class World {
 
         this.canvas = canvas;
         this.context = canvas.getContext("2d") as CanvasRenderingContext2D;
-        this.resizeCanvas();
+        this.resetCanvas();
 
         this.mousePosition = null;
         this.setupMouse();
@@ -368,7 +368,8 @@ export class World {
 
         this.lastTimeStamp = performance.now();
     }
-    resizeCanvas() {
+
+    resetCanvas() {
         this.context.fillStyle = this.worldProperties.backgroundColor;
         this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
         this.resetSpaceBuckets();
