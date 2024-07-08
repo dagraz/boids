@@ -11,11 +11,17 @@ import * as boids from "./boid.js";
 import * as config from "./config_manager.js";
 
 
-
+function resizeCanvas(canvas: HTMLCanvasElement) {
+    /*
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;        
+    */
+    canvas.width = 800;
+    canvas.height = 800;
+}
 
 const canvas = document.getElementsByTagName("canvas")[0];
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+resizeCanvas(canvas);
 
 const worldProperties = Object.assign({} as config.IndexableProperties, boids.worldPropertiesDefault);
 worldProperties.cohortColors = boids.worldPropertiesDefault.cohortColors.slice();
@@ -98,8 +104,7 @@ const getUrlButton = document.getElementById("getUrlButton") as HTMLElement;
 getUrlButton.addEventListener("click", getUrl);
 
 window.onresize = () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    resizeCanvas(canvas);
     world.resetCanvas();
 };
 
