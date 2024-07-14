@@ -466,8 +466,14 @@ export class World {
     }
 
     updateCohorts() {
+        // more restrictive than what CSS can support,
+        // but being paranoid about user string input. 
+        const colorValidator = /^#[a-fA-F\d]{6}$/;
         this.colors = this.worldProperties.cohortColors.
-            filter((value: string) => {return CSS.supports("color", value)});
+            filter((value: string) => {
+                return colorValidator.test(value) && CSS.supports("color", value)
+            }
+        );
 
         for (const boid of this.boids) {
             const cohortProperties = boid.cohortProperties;
